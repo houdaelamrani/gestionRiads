@@ -1,4 +1,4 @@
-/* Globals.css - Design System pour le projet PFA Riad Maroc */
+/* Globals.css - Design System MoroccoRiads */
 
 /* Importation des polices premium de Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
@@ -20,11 +20,11 @@
   --success: #10B981;
   --danger: #EF4444;
   --warning: #F59E0B;
-  
+
   /* Effets */
-  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-premium: 0 20px 25px -5px rgba(217, 107, 67, 0.1), 0 10px 10px -5px rgba(217, 107, 67, 0.04);
   --radius-sm: 8px;
   --radius-md: 16px;
@@ -35,13 +35,16 @@
 }
 
 /* Reset de base */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   min-height: 100vh;
   font-family: 'Outfit', sans-serif;
   background-color: var(--sand);
@@ -50,7 +53,12 @@ html, body {
   line-height: 1.5;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Playfair Display', serif;
   color: var(--dark);
   font-weight: 700;
@@ -63,10 +71,21 @@ a {
 }
 
 /* Typographie & Utilitaires */
-.text-terracotta { color: var(--terracotta); }
-.text-majorelle { color: var(--majorelle); }
-.text-gold { color: var(--gold); }
-.text-center { text-align: center; }
+.text-terracotta {
+  color: var(--terracotta);
+}
+
+.text-majorelle {
+  color: var(--majorelle);
+}
+
+.text-gold {
+  color: var(--gold);
+}
+
+.text-center {
+  text-align: center;
+}
 
 /* Boutons premium */
 .btn {
@@ -163,7 +182,8 @@ a {
   position: relative;
 }
 
-.nav-item:hover, .nav-item.active {
+.nav-item:hover,
+.nav-item.active {
   color: var(--terracotta);
 }
 
@@ -178,7 +198,8 @@ a {
   transition: var(--transition);
 }
 
-.nav-item:hover::after, .nav-item.active::after {
+.nav-item:hover::after,
+.nav-item.active::after {
   width: 100%;
 }
 
@@ -192,8 +213,8 @@ a {
   align-items: center;
   text-align: center;
   padding: 0 20px;
-  background: linear-gradient(rgba(30, 34, 41, 0.6), rgba(30, 34, 41, 0.75)), 
-              url('https://images.unsplash.com/photo-1539650116574-8efeb43e2750?q=80&w=1600&auto=format&fit=crop') no-repeat center center/cover;
+  background: linear-gradient(135deg, rgba(15, 82, 186, 0.45), rgba(217, 107, 67, 0.55)), 
+              url('https://res.cloudinary.com/mgmnml6e/image/upload/v1783968267/cjqazorrbe2gansbxt4k.jpg') no-repeat center center/cover;
   color: #fff;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   box-shadow: var(--shadow-lg);
@@ -260,7 +281,8 @@ a {
   color: var(--text-secondary);
 }
 
-.search-field select, .search-field input {
+.search-field select,
+.search-field input {
   width: 100%;
   padding: 12px;
   border: 1px solid var(--gray-light);
@@ -273,7 +295,8 @@ a {
   transition: var(--transition);
 }
 
-.search-field select:focus, .search-field input:focus {
+.search-field select:focus,
+.search-field input:focus {
   border-color: var(--terracotta);
   box-shadow: 0 0 0 3px rgba(217, 107, 67, 0.15);
 }
@@ -327,7 +350,7 @@ a {
   overflow: hidden;
   box-shadow: var(--shadow-md);
   transition: var(--transition);
-  border: 1px solid rgba(0,0,0,0.03);
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .riad-card:hover {
@@ -448,7 +471,7 @@ a {
 }
 
 .actors-header p {
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .tabs-container {
@@ -583,9 +606,20 @@ a {
   font-weight: 600;
 }
 
-.mock-ui-pill.pending { background: rgba(245, 158, 11, 0.2); color: #F59E0B; }
-.mock-ui-pill.success { background: rgba(16, 185, 129, 0.2); color: #10B981; }
-.mock-ui-pill.danger { background: rgba(239, 68, 68, 0.2); color: #EF4444; }
+.mock-ui-pill.pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: #F59E0B;
+}
+
+.mock-ui-pill.success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10B981;
+}
+
+.mock-ui-pill.danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+}
 
 /* Pied de page */
 .footer {
@@ -682,13 +716,16 @@ a {
   .search-widget {
     grid-template-columns: 1fr 1fr;
   }
+
   .search-btn-container {
     grid-column: span 2;
   }
+
   .actor-preview {
     grid-template-columns: 1fr;
     gap: 30px;
   }
+
   .footer-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -699,18 +736,23 @@ a {
     flex-direction: column;
     gap: 16px;
   }
+
   .nav-links {
     gap: 16px;
   }
+
   .hero-title {
     font-size: 2.2rem;
   }
+
   .search-widget {
     grid-template-columns: 1fr;
   }
+
   .search-btn-container {
     grid-column: span 1;
   }
+
   .footer-grid {
     grid-template-columns: 1fr;
   }
@@ -719,7 +761,7 @@ a {
 /* --- Formulaires d'Authentification (Login & Register) --- */
 .auth-page {
   background: linear-gradient(rgba(30, 34, 41, 0.45), rgba(30, 34, 41, 0.6)),
-              url('https://images.unsplash.com/photo-1590073844006-33379778ae09?q=80&w=1600&auto=format&fit=crop') no-repeat center center/cover;
+    url('https://images.unsplash.com/photo-1590073844006-33379778ae09?q=80&w=1600&auto=format&fit=crop') no-repeat center center/cover;
   min-height: 100vh;
   display: flex;
   justify-content: center;
@@ -766,7 +808,7 @@ a {
   gap: 16px;
 }
 
-.form-row > div {
+.form-row>div {
   flex: 1;
 }
 
@@ -895,7 +937,7 @@ a {
   border-radius: var(--radius-md);
   padding: 24px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(0,0,0,0.03);
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .panel-card h3 {
@@ -936,8 +978,15 @@ a {
   font-weight: 600;
 }
 
-.badge-valide { background-color: rgba(16, 185, 129, 0.15); color: var(--success); }
-.badge-attente { background-color: rgba(245, 158, 11, 0.15); color: var(--warning); }
+.badge-valide {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+.badge-attente {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
 
 .room-table {
   width: 100%;
@@ -945,7 +994,8 @@ a {
   margin-top: 15px;
 }
 
-.room-table th, .room-table td {
+.room-table th,
+.room-table td {
   padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid var(--gray-light);
@@ -1007,5 +1057,3 @@ a {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
   border: 1px solid var(--border) !important;
 }
-
-

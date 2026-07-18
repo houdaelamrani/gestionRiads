@@ -51,6 +51,15 @@ public class Riad {
     @Column(name = "prix_riad_entier", precision = 10, scale = 2)
     private BigDecimal prixRiadEntier;
 
+    @Column(name = "has_spa")
+    private Boolean hasSpa = false;
+
+    @Column(name = "has_traiteur")
+    private Boolean hasTraiteur = false;
+
+    @Column(name = "has_hammam")
+    private Boolean hasHammam = false;
+
     @CreationTimestamp
     @Column(name = "date_creation", updatable = false)
     private LocalDateTime dateCreation;

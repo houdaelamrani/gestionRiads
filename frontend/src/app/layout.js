@@ -1,5 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { LanguageProvider } from "../lib/LanguageContext";
+import Chatbot from "../components/Chatbot";
+import MessagingSimulator from "../components/MessagingSimulator";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,16 +15,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "MoroccoRiads - Gestion & Réservation de Riads au Maroc",
-  description: "Plateforme premium de gestion et réservation de Riads traditionnels au Maroc. Projet de Fin d'Études (PFA) avec Spring Boot et Next.js.",
+  title: "MoroccoRiads - Réservation de Riads d'exception au Maroc",
+  description: "Plateforme premium de réservation de Riads traditionnels au Maroc. Réservez votre séjour de rêve à Marrakech, Fès, Essaouira et vivez une expérience unique.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="fr" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        {children}
+        <LanguageProvider>
+          {children}
+          <Chatbot />
+          <MessagingSimulator />
+        </LanguageProvider>
       </body>
     </html>
   );
 }
+
+

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLanguage } from "../../lib/LanguageContext";
 
 export default function Login() {
   const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
   const [formData, setFormData] = useState({
     email: "",
     motDePasse: "",
@@ -29,14 +31,14 @@ export default function Login() {
     setLoading(false);
 
     if (!formData.email || !formData.motDePasse) {
-      setError("Veuillez remplir tous les champs obligatoires.");
+      setError(t("login_err_required"));
       return;
     }
 
     setLoading(true);
 
     try {
-      // Appel API vers notre backend Spring Boot
+      // Appel API vers le service d'authentification
       const response = await fetch("http://localhost:8080/api/auth/connexion", {
         method: "POST",
         headers: {
@@ -48,10 +50,10 @@ export default function Login() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Email ou mot de passe incorrect.");
+        throw new Error(data.message || (language === "en" ? "Incorrect email or password." : "Email ou mot de passe incorrect."));
       }
 
-      setSuccess("Connexion réussie ! Redirection vers votre espace...");
+      setSuccess(t("login_success"));
       
       // Stocker les données de session dans le localStorage
       localStorage.setItem("token", data.token);
@@ -78,7 +80,7 @@ export default function Login() {
       }, 1500);
 
     } catch (err) {
-      setError(err.message || "Une erreur est survenue lors de la connexion.");
+      setError(err.message || (language === "en" ? "An error occurred during login." : "Une erreur est survenue lors de la connexion."));
     } finally {
       setLoading(false);
     }
@@ -86,13 +88,50 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <div className="auth-card" style={{ position: "relative" }}>
+        
+        {/* Lang Selector inside card */}
+        <div style={{ position: "absolute", top: "20px", right: "20px", display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: "20px", padding: "2px", backgroundColor: "var(--bg-secondary)", zIndex: 10 }}>
+          <button
+            onClick={() => setLanguage("fr")}
+            style={{
+              background: language === "fr" ? "var(--terracotta)" : "transparent",
+              color: language === "fr" ? "#fff" : "var(--text-secondary)",
+              border: "none",
+              borderRadius: "18px",
+              padding: "3px 6px",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            FR
+          </button>
+          <button
+            onClick={() => setLanguage("en")}
+            style={{
+              background: language === "en" ? "var(--terracotta)" : "transparent",
+              color: language === "en" ? "#fff" : "var(--text-secondary)",
+              border: "none",
+              borderRadius: "18px",
+              padding: "3px 6px",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+          >
+            EN
+          </button>
+        </div>
+
         <div className="auth-header">
           <Link href="/" style={{ fontSize: "1.8rem", fontFamily: "Playfair Display, serif", fontWeight: "700", color: "var(--terracotta)", display: "inline-block", marginBottom: "12px" }}>
             Morocco<span style={{ color: "var(--majorelle)" }}>Riads</span>
           </Link>
-          <h2>Ravi de vous revoir !</h2>
-          <p>Connectez-vous pour accéder à votre espace personnalisé.</p>
+          <h2>{t("login_title")}</h2>
+          <p>{t("login_subtitle")}</p>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
@@ -100,7 +139,7 @@ export default function Login() {
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Adresse email</label>
+            <label htmlFor="email">{t("login_email")}</label>
             <input
               type="email"
               id="email"
@@ -114,7 +153,7 @@ export default function Login() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="motDePasse">Mot de passe</label>
+            <label htmlFor="motDePasse">{t("login_password")}</label>
             <input
               type="password"
               id="motDePasse"
@@ -133,15 +172,16 @@ export default function Login() {
             style={{ width: "100%", marginTop: "10px", padding: "14px" }}
             disabled={loading}
           >
-            {loading ? "Connexion en cours..." : "Se connecter"}
+            {loading ? t("login_loading") : t("login_btn")}
           </button>
         </form>
 
         <div className="auth-footer">
-          Nouveau sur MoroccoRiads ?{" "}
-          <Link href="/register">Créer un compte</Link>
+          {t("login_new")}{" "}
+          <Link href="/register">{t("login_create")}</Link>
         </div>
       </div>
     </div>
   );
 }
+

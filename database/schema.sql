@@ -37,6 +37,9 @@ CREATE TABLE riads (
     proprietaire_id UUID NOT NULL,
     statut_validation VARCHAR(20) NOT NULL DEFAULT 'EN_ATTENTE' CONSTRAINT chk_validation CHECK (statut_validation IN ('EN_ATTENTE', 'VALIDE', 'REJETE')),
     prix_riad_entier DECIMAL(10, 2) DEFAULT NULL, -- Tarif spécial si loué en entier (optionnel)
+    has_spa BOOLEAN DEFAULT FALSE,
+    has_traiteur BOOLEAN DEFAULT FALSE,
+    has_hammam BOOLEAN DEFAULT FALSE,
     date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_riad_proprietaire FOREIGN KEY (proprietaire_id) REFERENCES utilisateurs(id) ON DELETE CASCADE

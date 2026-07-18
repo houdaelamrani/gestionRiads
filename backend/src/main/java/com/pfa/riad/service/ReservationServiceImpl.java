@@ -36,6 +36,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final RiadRepository riadRepository;
     private final ChambreRepository chambreRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -134,6 +135,16 @@ public class ReservationServiceImpl implements ReservationService {
                 .build();
 
         paiementRepository.save(paiement);
+
+        // Envoi des notifications de confirmation (simulation)
+        String datesStr = String.format("%s au %s", savedReservation.getDateDebut().toString(), savedReservation.getDateFin().toString());
+        notificationService.envoyerConfirmationReservation(
+                client.getPrenom() + " " + client.getNom(),
+                client.getEmail(),
+                client.getTelephone(),
+                riad.getNom(),
+                datesStr
+        );
 
         return savedReservation;
     }

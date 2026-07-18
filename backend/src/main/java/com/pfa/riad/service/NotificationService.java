@@ -1,0 +1,99 @@
+package com.pfa.riad.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+@Service
+public class NotificationService {
+
+    private static final Logger logger = LoggerFactory.getLogger(NotificationService.class);
+
+    @Autowired(required = false)
+    private JavaMailSender mailSender;
+
+    @Value("${spring.mail.username:}")
+    private String mailFrom;
+
+    public void envoyerConfirmationReservation(String nomClient, String emailClient, String telephoneClient, String nomRiad, String dates) {
+        // Simulation SMS
+        String smsMessage = String.format("SMS pour %s (%s) : Votre réservation pour le %s (%s) est CONFIRMÉE ! Bon voyage. - MoroccoRiads",
+                nomClient, telephoneClient != null ? telephoneClient : "N/A", nomRiad, dates);
+        logger.info("[SIMULATION SMS] {}", smsMessage);
+        System.out.println("[SMS SENT] " + smsMessage);
+
+        // Simulation EMAIL
+        String emailBody = String.format(
+                "Bonjour %s,\n\n" +
+                "Nous avons le plaisir de vous confirmer votre réservation pour le Riad : %s.\n" +
+                "Dates du séjour : %s.\n\n" +
+                "L'art de l'hospitalité marocaine vous attend au cœur de la médina.\n\n" +
+                "Cordialement,\n" +
+                "L'équipe MoroccoRiads",
+                nomClient, nomRiad, dates
+        );
+        logger.info("[SIMULATION EMAIL] Destinataire: {}\nSujet: Confirmation de Réservation - MoroccoRiads\nCorps:\\n{}", emailClient, emailBody);
+        System.out.println("[EMAIL SENT] To: " + emailClient + "\n" + emailBody);
+
+        // Envoi de mail RÉEL si JavaMailSender est disponible
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                if (mailFrom != null && !mailFrom.trim().isEmpty()) {
+                    message.setFrom("MoroccoRiads <" + mailFrom + ">");
+                    message.setBcc(mailFrom);
+                } else {
+                    message.setFrom("booking@moroccoriads.com");
+                }
+                message.setTo(emailClient);
+                message.setSubject("Confirmation de Réservation - MoroccoRiads");
+                message.setText(emailBody);
+                mailSender.send(message);
+                logger.info("[MAIL RÉEL] Envoyé avec succès à {}", emailClient);
+            } catch (Exception e) {
+                logger.error("[MAIL RÉEL] Échec de l'envoi du mail réel à {} : {}", emailClient, e.getMessage());
+            }
+        } else {
+            logger.warn("[MAIL RÉEL] Non envoyé car JavaMailSender n'est pas configuré.");
+        }
+    }
+
+    public void envoyerRappelReservation(String nomClient, String emailClient, String nomRiad) {
+        String emailBody = String.format(
+                "Bonjour %s,\n\n" +
+                "Nous vous rappelons que votre séjour au Riad : %s commence demain.\n" +
+                "Les détails de votre accueil et l'assistance en direct sont disponibles dans votre espace client.\n\n" +
+                "Bon voyage,\n" +
+                "Le Concierge MoroccoRiads",
+                nomClient, nomRiad
+        );
+        logger.info("[SIMULATION EMAIL RAPPEL] Destinataire: {}\nSujet: Rappel de Séjour - MoroccoRiads\nCorps:\\n{}", emailClient, emailBody);
+        System.out.println("[EMAIL SENT RAPPEL] To: " + emailClient + "\n" + emailBody);
+
+        // Envoi de mail RÉEL si JavaMailSender est disponible
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                if (mailFrom != null && !mailFrom.trim().isEmpty()) {
+                    message.setFrom("MoroccoRiads <" + mailFrom + ">");
+                    message.setBcc(mailFrom); // Copie pour l'administrateur (son propre mail)
+                } else {
+                    message.setFrom("concierge@moroccoriads.com");
+                }
+                message.setTo(emailClient);
+                message.setSubject("Rappel de Séjour - MoroccoRiads");
+                message.setText(emailBody);
+                mailSender.send(message);
+                logger.info("[MAIL RÉEL RAPPEL] Envoyé avec succès à {}", emailClient);
+            } catch (Exception e) {
+                logger.error("[MAIL RÉEL RAPPEL] Échec de l'envoi du mail réel à {} : {}", emailClient, e.getMessage());
+            }
+        } else {
+            logger.warn("[MAIL RÉEL RAPPEL] Non envoyé car JavaMailSender n'est pas configuré.");
+        }
+    }
+}

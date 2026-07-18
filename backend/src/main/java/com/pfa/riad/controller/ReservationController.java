@@ -3,6 +3,7 @@ package com.pfa.riad.controller;
 import com.pfa.riad.dto.ReservationRequest;
 import com.pfa.riad.entity.Reservation;
 import com.pfa.riad.service.ReservationService;
+import com.pfa.riad.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final NotificationService notificationService;
 
     // 1. Créer une réservation (Client)
     @PostMapping
@@ -61,6 +63,16 @@ public class ReservationController {
             @PathVariable UUID id,
             @RequestHeader("X-User-Id") UUID userId) {
         reservationService.annulerReservation(id, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    // 6. Envoyer un e-mail de rappel de séjour (Démo)
+    @PostMapping("/rappel")
+    public ResponseEntity<Void> envoyerRappel(@RequestBody java.util.Map<String, String> payload) {
+        String nomClient = payload.get("nomClient");
+        String emailClient = payload.get("emailClient");
+        String nomRiad = payload.get("nomRiad");
+        notificationService.envoyerRappelReservation(nomClient, emailClient, nomRiad);
         return ResponseEntity.ok().build();
     }
 }

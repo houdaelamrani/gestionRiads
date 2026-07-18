@@ -2,18 +2,43 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { mapPhotoUrl } from "../lib/api.js";
+import { useLanguage } from "../lib/LanguageContext";
+import { getNotifications, markNotificationsAsRead, getUnreadCount } from "../lib/NotificationSystem";
 
 const API_BASE = "http://localhost:8080";
 
 export default function Home() {
+  const { language, setLanguage, t } = useLanguage();
   const [riads, setRiads] = useState([]);
   const [riadPhotos, setRiadPhotos] = useState({}); // { riadId: [photos] }
   const [riadAvis, setRiadAvis] = useState({}); // { riadId: { moy, count } }
   const [selectedCity, setSelectedCity] = useState("Tous");
-  const [activeActor, setActiveActor] = useState("client"); // client, owner, admin
   const [currentUser, setCurrentUser] = useState(null);
   const [loadingRiads, setLoadingRiads] = useState(true);
   const [availableCities, setAvailableCities] = useState(["Tous"]);
+
+  // États pour recherche avancée
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [guests, setGuests] = useState("");
+  const [maxBudget, setMaxBudget] = useState("");
+
+  // États pour notifications
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Synchronisation des notifications locales
+  useEffect(() => {
+    const updateNotifs = () => {
+      setNotifications(getNotifications());
+      setUnreadCount(getUnreadCount());
+    };
+    updateNotifs();
+    window.addEventListener("notifications_updated", updateNotifs);
+    return () => window.removeEventListener("notifications_updated", updateNotifs);
+  }, []);
 
   // ── Charger les riads depuis l'API ────────────────────────────────────────
   const fetchRiads = async (ville = "Tous") => {
@@ -77,9 +102,6 @@ export default function Home() {
     if (userStr) {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
-      if (user.role === "CLIENT") setActiveActor("client");
-      if (user.role === "PROPRIETAIRE") setActiveActor("owner");
-      if (user.role === "ADMIN") setActiveActor("admin");
     }
     fetchRiads();
   }, []);
@@ -100,6 +122,29 @@ export default function Home() {
     return "★".repeat(n) + "☆".repeat(5 - n);
   };
 
+  // Filtrage avancé côté client
+  const filteredRiadsList = riads.filter((riad) => {
+    // Filtrer par budget maximum
+    if (maxBudget) {
+      const limit = parseFloat(maxBudget);
+      const minPrice = riad.chambres?.length > 0
+        ? Math.min(...riad.chambres.map((c) => c.prixParNuit))
+        : riad.prixRiadEntier;
+      if (minPrice > limit) return false;
+    }
+    // Filtrer par nombre de voyageurs (capacité de chambre)
+    if (guests) {
+      const numGuests = parseInt(guests);
+      if (riad.chambres?.length > 0) {
+        const hasCapacity = riad.chambres.some((c) => c.capacite >= numGuests);
+        if (!hasCapacity) return false;
+      } else if (riad.capaciteMaximale && riad.capaciteMaximale < numGuests) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   return (
     <div>
       {/* 1. Navbar */}
@@ -110,16 +155,133 @@ export default function Home() {
         <ul className="nav-links">
           <li>
             <a href="#riads" className="nav-item active">
-              Nos Riads
+              {t("nav_riads")}
             </a>
           </li>
           <li>
             <a href="#comment" className="nav-item">
-              Comment ça marche ?
+              {t("nav_services")}
             </a>
           </li>
         </ul>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          
+          {/* Cloche de notifications */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                if (!showNotifications) markNotificationsAsRead();
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: "1.2rem",
+                cursor: "pointer",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                color: "var(--text-secondary)"
+              }}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span style={{
+                  position: "absolute",
+                  top: "-4px",
+                  right: "-4px",
+                  background: "#ef4444",
+                  color: "white",
+                  borderRadius: "50%",
+                  width: "16px",
+                  height: "16px",
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div style={{
+                position: "absolute",
+                top: "35px",
+                right: "0",
+                width: "290px",
+                backgroundColor: "#ffffff",
+                borderRadius: "12px",
+                boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                border: "1px solid var(--border)",
+                zIndex: 1000,
+                maxHeight: "320px",
+                overflowY: "auto",
+                padding: "10px 0"
+              }}>
+                <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: "0.85rem", color: "var(--text-primary)" }}>
+                  {language === "en" ? "Notifications" : "Notifications"}
+                </div>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: "20px 16px", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.82rem" }}>
+                    {language === "en" ? "No new notifications" : "Aucune notification"}
+                  </div>
+                ) : (
+                  notifications.map((n) => (
+                    <div key={n.id} style={{
+                      padding: "12px 16px",
+                      borderBottom: "1px solid var(--gray-light)",
+                      fontSize: "0.8rem",
+                      lineHeight: "1.4",
+                      backgroundColor: n.read ? "transparent" : "#f0f9ff",
+                      color: "var(--text-primary)"
+                    }}>
+                      {n.message}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Lang Selector */}
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: "20px", padding: "2px", backgroundColor: "var(--bg-secondary)" }}>
+            <button
+              onClick={() => setLanguage("fr")}
+              style={{
+                background: language === "fr" ? "var(--terracotta)" : "transparent",
+                color: language === "fr" ? "#fff" : "var(--text-secondary)",
+                border: "none",
+                borderRadius: "18px",
+                padding: "4px 10px",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              FR
+            </button>
+            <button
+              onClick={() => setLanguage("en")}
+              style={{
+                background: language === "en" ? "var(--terracotta)" : "transparent",
+                color: language === "en" ? "#fff" : "var(--text-secondary)",
+                border: "none",
+                borderRadius: "18px",
+                padding: "4px 10px",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              EN
+            </button>
+          </div>
+
           {currentUser ? (
             <>
               <span
@@ -128,7 +290,7 @@ export default function Home() {
                   color: "var(--text-secondary)",
                 }}
               >
-                Bonjour,{" "}
+                {t("hello")}{" "}
                 <strong style={{ color: "var(--terracotta)" }}>
                   {currentUser.prenom}
                 </strong>
@@ -144,7 +306,7 @@ export default function Home() {
                     color: "#3b82f6",
                   }}
                 >
-                  📋 Mon Espace Client
+                  {t("espace_client")}
                 </Link>
               )}
               <button
@@ -157,7 +319,7 @@ export default function Home() {
                   color: "var(--text-secondary)",
                 }}
               >
-                Déconnexion
+                {t("logout")}
               </button>
             </>
           ) : (
@@ -167,14 +329,14 @@ export default function Home() {
                 className="btn btn-secondary"
                 style={{ padding: "8px 16px", fontSize: "0.85rem" }}
               >
-                Connexion
+                {t("login")}
               </Link>
               <Link
                 href="/register"
                 className="btn btn-primary"
                 style={{ padding: "8px 20px", fontSize: "0.85rem" }}
               >
-                S'inscrire
+                {t("register")}
               </Link>
             </>
           )}
@@ -184,59 +346,190 @@ export default function Home() {
       {/* 2. Hero Section */}
       <header className="hero">
         <div className="hero-content">
-          <p className="hero-subtitle">Une immersion marocaine authentique</p>
+          <p className="hero-subtitle">{t("hero_subtitle")}</p>
           <h1 className="hero-title">
-            Trouvez le Riad de vos Rêves au Maroc
+            {t("hero_title")}
           </h1>
           <p className="hero-desc">
-            Réservez une chambre unique, plusieurs suites pour votre famille,
-            ou privatisez un riad entier à Marrakech, Fès ou Essaouira.
+            {t("hero_desc")}
           </p>
         </div>
       </header>
 
-      {/* 3. Widget de Recherche */}
-      <section className="search-container">
-        <div className="search-widget">
-          <div className="search-field">
-            <label htmlFor="ville">Destination (Ville)</label>
+      {/* 3. Widget de Recherche Style Airbnb Avancé */}
+      <section style={{ display: "flex", justifyContent: "center", marginTop: "-35px", marginBottom: "50px", position: "relative", zIndex: 10 }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          backgroundColor: "#ffffff",
+          borderRadius: "32px",
+          padding: "8px 16px 8px 24px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.02)",
+          border: "1px solid var(--border)",
+          width: "92%",
+          maxWidth: "850px",
+          gap: "12px",
+          transition: "box-shadow 0.2s"
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 10px 40px rgba(0,0,0,0.12)"}
+        onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 10px 30px rgba(0,0,0,0.08)"}
+        >
+          {/* Destination */}
+          <div style={{ flex: 1.2, minWidth: "140px", display: "flex", flexDirection: "column", textAlign: "left" }}>
+            <label htmlFor="ville" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.5px" }}>
+              {t("search_destination")}
+            </label>
             <select
               id="ville"
               value={selectedCity}
               onChange={(e) => handleCityFilter(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: "0.88rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "2px 0",
+                cursor: "pointer",
+                width: "100%"
+              }}
             >
               {availableCities.map((city) => (
                 <option key={city} value={city}>
-                  {city === "Tous" ? "Toutes les villes" : city}
+                  {city === "Tous" ? t("search_anywhere") : city}
                 </option>
               ))}
             </select>
           </div>
-          <div className="search-field">
-            <label htmlFor="checkin">Arrivée</label>
-            <input type="date" id="checkin" defaultValue="2026-08-01" />
+
+          <div style={{ width: "1px", height: "30px", backgroundColor: "var(--border)" }} />
+
+          {/* Dates d'arrivée & Départ */}
+          <div style={{ flex: 1, minWidth: "120px", display: "flex", flexDirection: "column", textAlign: "left" }}>
+            <label style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.5px" }}>
+              {language === "en" ? "Check-in" : "Arrivée"}
+            </label>
+            <input
+              type="date"
+              value={checkIn}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setCheckIn(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "2px 0",
+                cursor: "pointer",
+                width: "100%"
+              }}
+            />
           </div>
-          <div className="search-field">
-            <label htmlFor="checkout">Départ</label>
-            <input type="date" id="checkout" defaultValue="2026-08-05" />
+
+          <div style={{ width: "1px", height: "30px", backgroundColor: "var(--border)" }} />
+
+          <div style={{ flex: 1, minWidth: "120px", display: "flex", flexDirection: "column", textAlign: "left" }}>
+            <label style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.5px" }}>
+              {language === "en" ? "Check-out" : "Départ"}
+            </label>
+            <input
+              type="date"
+              value={checkOut}
+              min={checkIn || new Date().toISOString().split("T")[0]}
+              onChange={(e) => setCheckOut(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "2px 0",
+                cursor: "pointer",
+                width: "100%"
+              }}
+            />
           </div>
-          <div className="search-field">
-            <label htmlFor="chambres-count">Voyageurs</label>
-            <select id="chambres-count">
-              <option>1 Chambre (2 pers.)</option>
-              <option>Plusieurs Chambres</option>
-              <option>Riad Complet</option>
-            </select>
+
+          <div style={{ width: "1px", height: "30px", backgroundColor: "var(--border)" }} />
+
+          {/* Voyageurs */}
+          <div style={{ flex: 0.8, minWidth: "90px", display: "flex", flexDirection: "column", textAlign: "left" }}>
+            <label style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.5px" }}>
+              {language === "en" ? "Guests" : "Voyageurs"}
+            </label>
+            <input
+              type="number"
+              value={guests}
+              min="1"
+              max="20"
+              placeholder="1"
+              onChange={(e) => setGuests(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: "0.88rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "2px 0",
+                width: "100%"
+              }}
+            />
           </div>
-          <div className="search-btn-container">
-            <a
-              href="#riads"
-              className="btn btn-primary"
-              style={{ width: "100%", padding: "12px" }}
-            >
-              Rechercher
-            </a>
+
+          <div style={{ width: "1px", height: "30px", backgroundColor: "var(--border)" }} />
+
+          {/* Budget Max */}
+          <div style={{ flex: 1, minWidth: "110px", display: "flex", flexDirection: "column", textAlign: "left" }}>
+            <label style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.5px" }}>
+              {language === "en" ? "Max Budget" : "Budget Max"}
+            </label>
+            <input
+              type="number"
+              value={maxBudget}
+              placeholder="MAD / nuit"
+              onChange={(e) => setMaxBudget(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: "0.88rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "2px 0",
+                width: "100%"
+              }}
+            />
           </div>
+          
+          <a
+            href="#riads"
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              backgroundColor: "var(--terracotta)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "transform 0.15s",
+              fontSize: "1.1rem",
+              border: "none",
+              textDecoration: "none"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+            title={t("search_title")}
+          >
+            🔍
+          </a>
         </div>
       </section>
 
@@ -245,10 +538,9 @@ export default function Home() {
         {/* Section Riads Disponibles */}
         <section id="riads" style={{ padding: "60px 0" }}>
           <div className="section-header">
-            <h2>Riads Authentiques Populaires</h2>
+            <h2>{t("riads_title")}</h2>
             <p>
-              Découvrez notre sélection de Riads validés par notre équipe,
-              prêts à vous accueillir.
+              {t("riads_desc")}
             </p>
           </div>
 
@@ -260,14 +552,14 @@ export default function Home() {
                 color: "var(--text-secondary)",
               }}
             >
-              <p style={{ fontSize: "1.1rem" }}>Chargement des riads...</p>
+              <p style={{ fontSize: "1.1rem" }}>{t("loading_riads")}</p>
             </div>
           ) : (
-            <div className="riads-grid">
-              {riads.map((riad) => {
+            <div className="riads-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "32px 24px" }}>
+              {filteredRiadsList.map((riad) => {
                 const photos = riadPhotos[riad.id] || [];
                 const avisInfo = riadAvis[riad.id] || { moy: 0, count: 0 };
-                const mainPhoto = photos.length > 0 ? photos[0].url : null;
+                const mainPhoto = photos.length > 0 ? mapPhotoUrl(photos[0].url) : null;
                 const minPrice =
                   riad.chambres?.length > 0
                     ? Math.min(
@@ -275,102 +567,78 @@ export default function Home() {
                       )
                     : riad.prixRiadEntier;
 
+                const detailsUrl = currentUser?.role === "CLIENT" ? `/client/riads/${riad.id}` : "/login";
+
                 return (
-                  <article className="riad-card" key={riad.id}>
-                    <div className="riad-img-container">
-                      {avisInfo.count > 0 && (
-                        <span className="riad-tag">
-                          ★ {avisInfo.moy}
-                        </span>
-                      )}
-                      {mainPhoto ? (
-                        <img
-                          src={mainPhoto}
-                          alt={riad.nom}
-                          className="riad-img"
-                        />
-                      ) : (
-                        <div
-                          className="riad-img"
-                          style={{
-                            background:
-                              "linear-gradient(135deg, var(--terracotta), var(--majorelle))",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: "4rem",
-                            height: "100%",
-                            width: "100%",
-                          }}
-                        >
-                          🏡
-                        </div>
-                      )}
-                      <span className="riad-price-tag">
-                        Dès {minPrice ?? "—"} MAD / nuit
-                      </span>
-                    </div>
-                    <div className="riad-info">
-                      <p className="riad-city">{riad.ville}</p>
-                      <h3 className="riad-name">{riad.nom}</h3>
-                      <div className="riad-rating">
-                        <span>
-                          {riad.chambres?.length ?? 0} chambres disponibles
-                          {avisInfo.count > 0 && (
-                            <>
-                              {" "}
-                              •{" "}
-                              <span style={{ color: "#f59e0b" }}>
-                                {renderStars(avisInfo.moy)}
-                              </span>{" "}
-                              {avisInfo.count} avis
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      <p className="riad-desc">{riad.description}</p>
-                      <div className="riad-footer">
-                        <span
-                          style={{
-                            fontSize: "0.85rem",
-                            color: "var(--text-secondary)",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          📍 {riad.adresse}
-                        </span>
-                        {currentUser?.role === "CLIENT" ? (
-                          <Link
-                            href="/client"
-                            className="btn btn-secondary"
-                            style={{
-                              padding: "6px 14px",
-                              fontSize: "0.85rem",
-                            }}
-                          >
-                            Réserver
-                          </Link>
+                  <Link href={detailsUrl} key={riad.id} style={{ textDecoration: "none", color: "inherit" }}>
+                    <article style={{ display: "flex", flexDirection: "column", gap: "12px", cursor: "pointer" }}>
+                      {/* Image Container */}
+                      <div style={{ position: "relative", width: "100%", aspectRatio: "20 / 19", borderRadius: "12px", overflow: "hidden", backgroundColor: "#e2e8f0" }}>
+                        {mainPhoto ? (
+                          <img
+                            src={mainPhoto}
+                            alt={riad.nom}
+                            style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.3s" }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.04)"}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                          />
                         ) : (
-                          <Link
-                            href="/login"
-                            className="btn btn-secondary"
-                            style={{
-                              padding: "6px 14px",
-                              fontSize: "0.85rem",
-                            }}
-                          >
-                            Réserver
-                          </Link>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: "3rem", background: "linear-gradient(135deg, var(--terracotta), var(--majorelle))" }}>
+                            🏡
+                          </div>
                         )}
                       </div>
-                    </div>
-                  </article>
+
+                      {/* Info Container */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        {/* Title and Rating */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                          <span style={{ fontWeight: 600, fontSize: "0.98rem", color: "var(--text-primary)" }}>{riad.nom}</span>
+                          {avisInfo.count > 0 && (
+                            <span style={{ fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "3px", color: "var(--text-primary)", flexShrink: 0 }}>
+                              ★ {avisInfo.moy}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Location */}
+                        <span style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>{riad.ville}, Maroc</span>
+
+                        {/* Chambres count */}
+                        <span style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>{riad.chambres?.length ?? 0} {t("chambres_count")}</span>
+
+                        {/* Services (Spa, Traiteur, Hammam) */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px", marginBottom: "4px" }}>
+                          {riad.hasSpa && (
+                            <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: "10px", backgroundColor: "#f3e8ff", color: "#7c3aed", fontWeight: 600 }}>
+                              🧖‍♀️ Spa
+                            </span>
+                          )}
+                          {riad.hasHammam && (
+                            <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: "10px", backgroundColor: "#e0f2fe", color: "#0284c7", fontWeight: 600 }}>
+                              🧼 Hammam
+                            </span>
+                          )}
+                          {riad.hasTraiteur && (
+                            <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: "10px", backgroundColor: "#fef3c7", color: "#d97706", fontWeight: 600 }}>
+                              🍽️ Traiteur
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Price */}
+                        <span style={{ fontSize: "0.92rem", marginTop: "2px", color: "var(--text-primary)" }}>
+                          <strong style={{ fontWeight: 600 }}>{minPrice ?? "—"} MAD</strong> {t("per_night")}
+                        </span>
+                      </div>
+                    </article>
+                  </Link>
                 );
               })}
-              {riads.length === 0 && !loadingRiads && (
+              {filteredRiadsList.length === 0 && !loadingRiads && (
                 <div
                   style={{
-                    gridColumn: "span 3",
+                    gridColumn: "span 12",
                     textAlign: "center",
                     padding: "40px",
                     backgroundColor: "#fff",
@@ -378,7 +646,7 @@ export default function Home() {
                   }}
                 >
                   <p style={{ color: "var(--text-secondary)" }}>
-                    Aucun riad disponible dans cette ville pour le moment.
+                    {t("no_riads")}
                   </p>
                 </div>
               )}
@@ -388,13 +656,12 @@ export default function Home() {
 
 
 
-        {/* Section Comment ça marche */}
+        {/* Section Services Premium */}
         <section id="comment" style={{ padding: "40px 0 80px 0" }}>
           <div className="section-header">
-            <h2>Fonctionnalités Clés du Projet PFA</h2>
+            <h2>{t("services_title")}</h2>
             <p>
-              Notre architecture Spring Boot, Next.js et PostgreSQL couvre les
-              flux métiers essentiels :
+              {t("services_desc")}
             </p>
           </div>
 
@@ -415,24 +682,24 @@ export default function Home() {
             >
               <div
                 style={{
-                  color: "var(--terracotta)",
-                  fontSize: "2rem",
+                  color: "#7c3aed",
+                  fontSize: "2.5rem",
                   marginBottom: "16px",
                 }}
               >
-                🔍
+                🧖‍♀️
               </div>
-              <h3 style={{ fontSize: "1.2rem", marginBottom: "12px" }}>
-                Filtres & Photos
+              <h3 style={{ fontSize: "1.2rem", marginBottom: "12px", color: "var(--text-primary)" }}>
+                {t("service_spa_title")}
               </h3>
               <p
                 style={{
                   color: "var(--text-secondary)",
                   fontSize: "0.95rem",
+                  lineHeight: "1.6"
                 }}
               >
-                Recherche de riads par ville. Affichage de galeries photos
-                hébergées sur le cloud gratuit Cloudinary.
+                {t("service_spa_desc")}
               </p>
             </div>
             <div
@@ -445,25 +712,24 @@ export default function Home() {
             >
               <div
                 style={{
-                  color: "var(--majorelle)",
-                  fontSize: "2rem",
+                  color: "#0284c7",
+                  fontSize: "2.5rem",
                   marginBottom: "16px",
                 }}
               >
-                📅
+                🧼
               </div>
-              <h3 style={{ fontSize: "1.2rem", marginBottom: "12px" }}>
-                Réservations Flexibles
+              <h3 style={{ fontSize: "1.2rem", marginBottom: "12px", color: "var(--text-primary)" }}>
+                {t("service_hammam_title")}
               </h3>
               <p
                 style={{
                   color: "var(--text-secondary)",
                   fontSize: "0.95rem",
+                  lineHeight: "1.6"
                 }}
               >
-                Une table d'association `reservation_chambres` permet au
-                client de louer une chambre, plusieurs ou de privatiser le
-                riad.
+                {t("service_hammam_desc")}
               </p>
             </div>
             <div
@@ -476,24 +742,24 @@ export default function Home() {
             >
               <div
                 style={{
-                  color: "var(--gold)",
-                  fontSize: "2rem",
+                  color: "#d97706",
+                  fontSize: "2.5rem",
                   marginBottom: "16px",
                 }}
               >
-                ⭐
+                🍽️
               </div>
-              <h3 style={{ fontSize: "1.2rem", marginBottom: "12px" }}>
-                Avis & Notes
+              <h3 style={{ fontSize: "1.2rem", marginBottom: "12px", color: "var(--text-primary)" }}>
+                {t("service_traiteur_title")}
               </h3>
               <p
                 style={{
                   color: "var(--text-secondary)",
                   fontSize: "0.95rem",
+                  lineHeight: "1.6"
                 }}
               >
-                Partagez votre expérience et donnez une évaluation de 1 à 5
-                étoiles après chaque séjour pour guider les autres voyageurs.
+                {t("service_traiteur_desc")}
               </p>
             </div>
           </div>
@@ -508,12 +774,11 @@ export default function Home() {
               Morocco<span>Riads</span>
             </h3>
             <p className="footer-desc">
-              La plateforme de référence pour réserver des séjours uniques
-              dans les plus beaux riads traditionnels du Maroc.
+              {t("footer_desc")}
             </p>
           </div>
           <div className="footer-col">
-            <h4>Destinations</h4>
+            <h4>{t("footer_destinations")}</h4>
             <ul className="footer-links">
               <li>
                 <a href="#" onClick={() => handleCityFilter("Marrakech")}>
@@ -533,44 +798,44 @@ export default function Home() {
             </ul>
           </div>
           <div className="footer-col">
-            <h4>Plateforme</h4>
+            <h4>{t("footer_platform")}</h4>
             <ul className="footer-links">
               <li>
-                <a href="#riads">Nos Riads</a>
+                <a href="#riads">{t("nav_riads")}</a>
               </li>
               <li>
-                <a href="#comment">Fonctionnalités</a>
+                <a href="#comment">{t("nav_services")}</a>
               </li>
             </ul>
           </div>
           <div className="footer-col">
-            <h4>Newsletter</h4>
+            <h4>{t("footer_newsletter")}</h4>
             <p style={{ fontSize: "0.9rem", marginBottom: "16px" }}>
-              Abonnez-vous pour recevoir des offres exclusives.
+              {t("newsletter_desc")}
             </p>
             <form
               className="newsletter-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                alert("Abonnement réussi !");
+                alert(t("newsletter_success"));
               }}
             >
-              <input type="email" placeholder="Votre email" required />
+              <input type="email" placeholder={t("newsletter_placeholder")} required />
               <button
                 type="submit"
                 className="btn btn-primary"
                 style={{ padding: "10px 16px" }}
               >
-                S'abonner
+                {t("newsletter_btn")}
               </button>
             </form>
           </div>
         </div>
         <div className="footer-bottom">
           <p>
-            © 2026 MoroccoRiads. Projet PFA de gestion des Riads au Maroc.
+            {t("footer_rights")}
           </p>
-          <p>Technologies : Spring Boot 3 + Next.js 16 + PostgreSQL</p>
+          <p>{t("footer_motto")}</p>
         </div>
       </footer>
     </div>

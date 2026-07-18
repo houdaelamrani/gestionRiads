@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -25,6 +27,7 @@ public class Chambre {
     @NotNull(message = "Le riad associé est obligatoire")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "riad_id", nullable = false)
+    @JsonIgnore
     private Riad riad;
 
     @NotBlank(message = "Le nom ou numéro de la chambre est obligatoire")

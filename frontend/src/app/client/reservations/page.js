@@ -2,17 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useLanguage } from "../../../lib/LanguageContext";
 
 const API_BASE = "http://localhost:8080";
 
 const statutBadge = {
-  EN_ATTENTE: { label: "En attente", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
-  CONFIRMEE: { label: "Confirmée", color: "#10b981", bg: "rgba(16,185,129,0.12)" },
-  ANNULEE: { label: "Annulée", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
-  REFUSEE: { label: "Refusée", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+  EN_ATTENTE: { color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  CONFIRMEE: { color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  ANNULEE: { color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+  REFUSEE: { color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
 };
 
 export default function ClientReservations() {
+  const { t } = useLanguage();
   const [currentUser, setCurrentUser] = useState(null);
   const [reservations, setReservations] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(true);
@@ -24,6 +26,16 @@ export default function ClientReservations() {
   const [avisRiadId, setAvisRiadId] = useState(null);
   const [avisRiadNom, setAvisRiadNom] = useState("");
   const [avisForm, setAvisForm] = useState({ note: 5, commentaire: "" });
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "EN_ATTENTE": return t("status_pending");
+      case "CONFIRMEE": return t("status_confirmed");
+      case "ANNULEE": return t("status_cancelled");
+      case "REFUSEE": return t("status_refused");
+      default: return status;
+    }
+  };
 
   const fetchReservations = useCallback(async (userId) => {
     setReservationsLoading(true);
@@ -50,8 +62,18 @@ export default function ClientReservations() {
     }
   }, [fetchReservations]);
 
+  // Vider automatiquement le message de succès après 5 secondes
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess("");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
   const handleAnnuler = async (reservationId) => {
-    if (!confirm("Êtes-vous sûr de vouloir annuler cette réservation ?")) return;
+    if (!confirm(t("confirm_cancel"))) return;
     setActionLoading(true);
     setError("");
     setSuccess("");
@@ -61,7 +83,7 @@ export default function ClientReservations() {
         headers: { "X-User-Id": currentUser.id },
       });
       if (!res.ok) throw new Error("Impossible d'annuler cette réservation.");
-      setSuccess("Réservation annulée.");
+      setSuccess(t("res_cancelled"));
       fetchReservations(currentUser.id);
     } catch (e) {
       setError(e.message);
@@ -98,7 +120,7 @@ export default function ClientReservations() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Erreur lors de la soumission de l'avis.");
-      setSuccess("Avis soumis avec succès ! Merci pour votre retour.");
+      setSuccess(t("review_success"));
       setShowAvisModal(false);
     } catch (e) {
       setError(e.message);
@@ -123,10 +145,10 @@ export default function ClientReservations() {
 
       <div style={{ marginBottom: "32px" }}>
         <h1 style={{ fontFamily: "Playfair Display, serif", fontSize: "2.2rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>
-          Mes Réservations
+          {t("reservations_title")}
         </h1>
         <p style={{ color: "var(--text-secondary)" }}>
-          Retrouvez ici toutes vos réservations passées et en cours.
+          {t("reservations_subtitle")}
         </p>
       </div>
 
@@ -138,16 +160,17 @@ export default function ClientReservations() {
         <div style={{ textAlign: "center", padding: "80px 0" }}>
           <p style={{ fontSize: "3rem", marginBottom: "16px" }}>📋</p>
           <p style={{ fontSize: "1.1rem", color: "var(--text-secondary)", marginBottom: "24px" }}>
-            Vous n'avez pas encore de réservations.
+            {t("no_reservations")}
           </p>
           <Link href="/client/catalogue" className="btn btn-primary" style={{ padding: "12px 28px" }}>
-            Explorer les Riads
+            {t("explore_riads")}
           </Link>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {reservations.map((res) => {
-            const badge = statutBadge[res.statut] || { label: res.statut, color: "#6b7280", bg: "rgba(107,114,128,0.1)" };
+            const badge = statutBadge[res.statut] || { color: "#6b7280", bg: "rgba(107,114,128,0.1)" };
+            const label = getStatusLabel(res.statut);
             return (
               <div key={res.id} className="card" style={{ padding: "24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
@@ -156,18 +179,18 @@ export default function ClientReservations() {
                       {res.riad?.nom ?? "Riad"}
                     </h3>
                     <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>
-                      📅 Du <strong>{res.dateDebut}</strong> au <strong>{res.dateFin}</strong>
+                      📅 {t("from")} <strong>{res.dateDebut}</strong> {t("to")} <strong>{res.dateFin}</strong>
                     </p>
                     <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", marginTop: "4px" }}>
-                      💰 Total : <strong style={{ color: "var(--terracotta)" }}>{res.prixTotal} MAD</strong>
+                      💰 {t("total")} <strong style={{ color: "var(--terracotta)" }}>{res.prixTotal} MAD</strong>
                     </p>
                     {res.riadEntier && (
-                      <p style={{ color: "var(--majorelle)", fontSize: "0.82rem", marginTop: "4px" }}>🏡 Riad entier</p>
+                      <p style={{ color: "var(--majorelle)", fontSize: "0.82rem", marginTop: "4px" }}>{t("entire_riad")}</p>
                     )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "10px" }}>
                     <span style={{ padding: "4px 14px", borderRadius: "20px", fontSize: "0.82rem", fontWeight: 600, color: badge.color, background: badge.bg }}>
-                      {badge.label}
+                      {label}
                     </span>
                     <div style={{ display: "flex", gap: "8px" }}>
                       {res.statut === "EN_ATTENTE" && (
@@ -176,7 +199,7 @@ export default function ClientReservations() {
                           disabled={actionLoading}
                           style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.06)", color: "#ef4444", cursor: "pointer", fontSize: "0.82rem", fontWeight: 500 }}
                         >
-                          Annuler
+                          {t("cancel")}
                         </button>
                       )}
                       {res.statut === "CONFIRMEE" && res.riad && (
@@ -184,7 +207,7 @@ export default function ClientReservations() {
                           onClick={() => openAvisModal(res.riad.id, res.riad.nom)}
                           style={{ padding: "7px 16px", borderRadius: "8px", border: "1px solid rgba(245,158,11,0.4)", background: "rgba(245,158,11,0.06)", color: "#f59e0b", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600 }}
                         >
-                          ⭐ Laisser un avis
+                          {t("leave_review")}
                         </button>
                       )}
                     </div>
@@ -202,14 +225,14 @@ export default function ClientReservations() {
           <div className="card" style={{ width: "100%", maxWidth: "480px", padding: "32px", backgroundColor: "#ffffff", color: "var(--text-primary)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
               <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "1.4rem", fontWeight: 700, color: "var(--text-primary)" }}>
-                ⭐ Avis — {avisRiadNom}
+                {t("review_title")} {avisRiadNom}
               </h2>
               <button onClick={() => setShowAvisModal(false)} style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "var(--text-secondary)" }}>×</button>
             </div>
 
             <form onSubmit={handleAvisSubmit}>
               <div style={{ marginBottom: "24px", textAlign: "center" }}>
-                <p style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "12px" }}>Votre note</p>
+                <p style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "12px" }}>{t("your_rating")}</p>
                 <div style={{ display: "flex", justifyContent: "center", gap: "8px" }}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -234,10 +257,10 @@ export default function ClientReservations() {
               </div>
 
               <div className="form-group" style={{ marginBottom: "24px" }}>
-                <label>Votre commentaire (optionnel)</label>
+                <label>{t("your_comment")}</label>
                 <textarea
                   className="form-input-control"
-                  placeholder="Racontez votre expérience dans ce riad..."
+                  placeholder={t("comment_placeholder")}
                   style={{ minHeight: "100px", resize: "vertical" }}
                   value={avisForm.commentaire}
                   onChange={(e) => setAvisForm((prev) => ({ ...prev, commentaire: e.target.value }))}
@@ -245,7 +268,7 @@ export default function ClientReservations() {
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "14px", fontSize: "1rem" }} disabled={actionLoading}>
-                {actionLoading ? "Envoi en cours..." : "Soumettre mon avis"}
+                {actionLoading ? t("sending_review") : t("submit_review")}
               </button>
             </form>
           </div>
@@ -254,3 +277,4 @@ export default function ClientReservations() {
     </div>
   );
 }
+

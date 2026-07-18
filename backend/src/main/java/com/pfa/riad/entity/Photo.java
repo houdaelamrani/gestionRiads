@@ -1,5 +1,6 @@
 package com.pfa.riad.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -23,9 +24,11 @@ public class Photo {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "riad_id")
+    @JsonIgnore
     private Riad riad;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "chambre_id")
+    @JsonIgnore
     private Chambre chambre;
 }

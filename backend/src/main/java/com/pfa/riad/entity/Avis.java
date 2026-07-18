@@ -1,5 +1,6 @@
 package com.pfa.riad.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -29,6 +30,7 @@ public class Avis {
     @NotNull(message = "Le riad associé est obligatoire")
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "riad_id", nullable = false)
+    @JsonIgnore
     private Riad riad;
 
     @NotNull(message = "La note est obligatoire")

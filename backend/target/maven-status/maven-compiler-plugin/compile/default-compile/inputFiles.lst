@@ -3,6 +3,7 @@ D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\config\SecurityConfig.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\AuthController.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\AvisController.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\ChambreController.java
+D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\ChatController.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\PhotoController.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\ReservationController.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\controller\RiadController.java
@@ -42,6 +43,7 @@ D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\AvisService.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\AvisServiceImpl.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\ChambreService.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\ChambreServiceImpl.java
+D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\NotificationService.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\PhotoService.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\PhotoServiceImpl.java
 D:\pfa1.0.0\backend\src\main\java\com\pfa\riad\service\ReservationService.java

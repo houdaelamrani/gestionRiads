@@ -39,8 +39,10 @@ com\pfa\riad\dto\ReservationRequest.class
 com\pfa\riad\entity\Riad$RiadBuilder.class
 com\pfa\riad\service\AuthService.class
 com\pfa\riad\enums\StatutUtilisateur.class
+com\pfa\riad\service\NotificationService.class
 com\pfa\riad\enums\MethodePaiement.class
 com\pfa\riad\enums\Role.class
+com\pfa\riad\controller\ChatController.class
 com\pfa\riad\dto\InscriptionRequest.class
 com\pfa\riad\entity\Avis$AvisBuilder.class
 com\pfa\riad\entity\Riad.class

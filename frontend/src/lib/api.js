@@ -67,3 +67,21 @@ export async function apiPut(path, body = null, userId = null) {
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
+
+/**
+ * Mappe les anciennes photos de test Unsplash vers les nouvelles photos professionnelles Cloudinary
+ * pour s'assurer que le rendu est de haute qualité sans avoir à réimporter la BDD.
+ */
+export function mapPhotoUrl(url) {
+  if (!url) return null;
+  if (url.includes("photo-1539650116574")) {
+    return "https://res.cloudinary.com/mgmnml6e/image/upload/v1783959393/j5jlng36f4zyt1vswgou.jpg";
+  }
+  if (url.includes("photo-1506929562872")) {
+    return "https://res.cloudinary.com/mgmnml6e/image/upload/v1783959416/okulb7fkvy7e8zicav96.jpg";
+  }
+  if (url.includes("photo-1618773928121")) {
+    return "https://res.cloudinary.com/mgmnml6e/image/upload/v1783959443/ovth8kcv4z1xzoqj1z9o.jpg";
+  }
+  return url;
+}

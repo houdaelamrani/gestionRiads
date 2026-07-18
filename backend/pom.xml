@@ -53,6 +53,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         
+        <!-- Spring Boot Starter Mail pour l'envoi de mails réels -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        
         <!-- Spring Security pour le hashage de mot de passe et la sécurité -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
