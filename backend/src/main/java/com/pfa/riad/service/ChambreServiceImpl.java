@@ -54,9 +54,17 @@ public class ChambreServiceImpl implements ChambreService {
 
     @Override
     public List<Chambre> obtenirChambresRiad(UUID riadId) {
-        // Obtenir la liste des chambres pour un Riad donné
+        return obtenirChambresRiad(riadId, false);
+    }
+
+    @Override
+    public List<Chambre> obtenirChambresRiad(UUID riadId, Boolean disponibleOnly) {
+        if (Boolean.TRUE.equals(disponibleOnly)) {
+            return chambreRepository.findByRiadIdAndDisponible(riadId, true);
+        }
         return chambreRepository.findByRiadId(riadId);
     }
+
 
     @Override
     public Chambre modifierDisponibilite(UUID chambreId, Boolean disponible, UUID proprietaireId) {

@@ -1,0 +1,19 @@
+# Backend build folder
+backend/target/
+target/
+
+# IDE configs
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Logs and temp files
+*.log
+postgres-err.txt
+postgres-out.txt
+
+# OS metadata
+.DS_Store
+Thumbs.db

@@ -12,4 +12,8 @@ public interface ChambreRepository extends JpaRepository<Chambre, UUID> {
 
     // Trouver toutes les chambres appartenant à un Riad spécifique
     List<Chambre> findByRiadId(UUID riadId);
+
+    // Trouver uniquement les chambres avec un statut de disponibilité donné
+    List<Chambre> findByRiadIdAndDisponible(UUID riadId, Boolean disponible);
 }
+

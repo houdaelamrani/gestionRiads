@@ -6,7 +6,7 @@ TRUNCATE TABLE avis, paiements, reservation_chambres, reservations, photos, cham
 
 -- 1. Insertion des Utilisateurs (Administrateur, Propriétaires, Clients)
 INSERT INTO utilisateurs (id, nom, prenom, email, mot_de_passe, telephone, role, statut) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'El Amrani', 'Yassine', 'admin@riad.ma', 'admin123', '+212600000001', 'ADMIN', 'ACTIF'),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'El Amrani', 'houda', 'admin@riad.ma', 'admin123', '+212600000001', 'ADMIN', 'ACTIF'),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Alaoui', 'Mustapha', 'owner1@riad.ma', 'owner123', '+212600000002', 'PROPRIETAIRE', 'ACTIF'),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Tazi', 'Khadija', 'owner2@riad.ma', 'owner123', '+212600000003', 'PROPRIETAIRE', 'ACTIF'),
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'Dupont', 'Jean', 'client1@riad.ma', 'client123', '+33612345678', 'CLIENT', 'ACTIF'),

@@ -22,6 +22,9 @@ export default function RiadDetailPage({ params }) {
   const [clientReservations, setClientReservations] = useState([]);
   const [chambrePhotosMap, setChambrePhotosMap] = useState({}); // { chambreId: [photos] }
 
+  // États de filtrage des chambres
+  const [selectedType, setSelectedType] = useState("Tous");
+
   // États de la modale de réservation active
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -118,6 +121,57 @@ export default function RiadDetailPage({ params }) {
       setLoading(false);
     }
   };
+
+  // Vérifier si le riad entier est réservé par le client
+  const isRiadEntierReserved = useMemo(() => {
+    return clientReservations.some(res =>
+      (res.statut === "EN_ATTENTE" || res.statut === "CONFIRMEE") && res.riadEntier
+    );
+  }, [clientReservations]);
+
+  // Vérifier si une chambre ou plus est réservée ou en attente
+  const hasAnyRoomReserved = useMemo(() => {
+    return rooms.some((ch) =>
+      clientReservations.some(res =>
+        (res.statut === "EN_ATTENTE" || res.statut === "CONFIRMEE") &&
+        (!res.riadEntier && res.chambres?.some(room => room.id === ch.id))
+      )
+    );
+  }, [rooms, clientReservations]);
+
+  // Types de chambres disponibles pour le filtre
+  const roomTypes = useMemo(() => {
+    const types = new Set(rooms.map((ch) => ch.typeChambre).filter(Boolean));
+    return ["Tous", ...Array.from(types)];
+  }, [rooms]);
+
+  // Chambres filtrées (uniquement disponibles)
+  const filteredRooms = useMemo(() => {
+    if (isRiadEntierReserved) {
+      return []; // Si le riad entier est privatisé, aucune chambre individuelle n'est disponible
+    }
+    return rooms.filter((ch) => {
+      // 1. Indisponible par l'hôte
+      if (ch.disponible === false) {
+        return false;
+      }
+      
+      // 2. Déjà réservée ou en attente par le client
+      const activeRes = clientReservations.find(res =>
+        (res.statut === "EN_ATTENTE" || res.statut === "CONFIRMEE") &&
+        (!res.riadEntier && res.chambres?.some(room => room.id === ch.id))
+      );
+      if (activeRes) {
+        return false;
+      }
+
+      // 3. Filtre par type
+      if (selectedType !== "Tous" && ch.typeChambre !== selectedType) {
+        return false;
+      }
+      return true;
+    });
+  }, [rooms, clientReservations, isRiadEntierReserved, selectedType]);
 
   // Calcul des nuits
   const nights = useMemo(() => {
@@ -276,8 +330,8 @@ export default function RiadDetailPage({ params }) {
             email: currentUser.email,
             subject: language === "en" ? "Stay Reminder - MoroccoRiads" : "Rappel de Séjour - MoroccoRiads",
             message: language === "en"
-              ? `Hello ${currentUser.prenom},\n\nThis is a friendly reminder that your stay at Riad ${riad.nom} starts tomorrow.\nYour check-in details and assistance are available in your chatbot concierge.\n\nSafe travels,\nMoroccoRiads Concierge`
-              : `Bonjour ${currentUser.prenom},\n\nNous vous rappelons que votre séjour au Riad ${riad.nom} commence demain.\nLes détails de votre accueil et l'assistance en direct sont disponibles dans notre chatbot.\n\nBon voyage,\nLe Concierge MoroccoRiads`
+              ? `Hello ${currentUser.prenom},\n\nThis is a friendly reminder that your stay at Riad ${riad.nom} starts tomorrow.\nYour check-in details and assistance are available in your client dashboard.\n\nSafe travels,\nMoroccoRiads Concierge`
+              : `Bonjour ${currentUser.prenom},\n\nNous vous rappelons que votre séjour au Riad ${riad.nom} commence demain.\nLes détails de votre accueil et l'assistance en direct sont disponibles dans votre espace client.\n\nBon voyage,\nLe Concierge MoroccoRiads`
           }
         }));
 
@@ -339,19 +393,6 @@ export default function RiadDetailPage({ params }) {
       </div>
     );
   }
-
-  // Vérifier si le riad entier est réservé par le client
-  const isRiadEntierReserved = clientReservations.some(res =>
-    (res.statut === "EN_ATTENTE" || res.statut === "CONFIRMEE") && res.riadEntier
-  );
-
-  // Vérifier si une chambre ou plus est réservée ou en attente
-  const hasAnyRoomReserved = rooms.some((ch) =>
-    clientReservations.some(res =>
-      (res.statut === "EN_ATTENTE" || res.statut === "CONFIRMEE") &&
-      (!res.riadEntier && res.chambres?.some(room => room.id === ch.id))
-    )
-  );
 
   const isPrivatisationDisabled = isRiadEntierReserved || hasAnyRoomReserved;
 
@@ -467,17 +508,49 @@ export default function RiadDetailPage({ params }) {
         </div>
       </div>
 
-      {/* Liste des Chambres Disponibles (Pleine Largeur) */}
+      {/* Liste des Chambres (Pleine Largeur) */}
       <div style={{ marginBottom: "40px" }}>
-        <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "1.5rem", marginBottom: "24px", color: "var(--text-primary)" }}>
-          {t("available_rooms")}
-        </h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "20px" }}>
+          <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "1.5rem", margin: 0, color: "var(--text-primary)" }}>
+            {t("available_rooms")}
+          </h2>
+
+          {/* Barre de Filtres des Chambres */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+
+            {/* Sélecteur de Type de Chambre */}
+            {roomTypes.length > 2 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 500 }}>{t("filter_type_label")}</span>
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border)",
+                    fontSize: "0.85rem",
+                    outline: "none",
+                    cursor: "pointer",
+                    backgroundColor: "#fff"
+                  }}
+                >
+                  {roomTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type === "Tous" ? t("filter_all_types") : type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
         
-        {rooms.length === 0 ? (
-          <p style={{ color: "var(--text-secondary)" }}>{t("no_rooms_available")}</p>
+        {filteredRooms.length === 0 ? (
+          <p style={{ color: "var(--text-secondary)", padding: "20px 0" }}>{t("no_rooms_available")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {rooms.map((ch) => {
+            {filteredRooms.map((ch) => {
               const chPhotos = chambrePhotosMap[ch.id] || [];
               const chPhotoUrl = chPhotos.length > 0 ? mapPhotoUrl(chPhotos[0].url) : null;
 
@@ -487,6 +560,7 @@ export default function RiadDetailPage({ params }) {
                 (res.riadEntier || res.chambres?.some(room => room.id === ch.id))
               );
 
+              const isHostUnavailable = ch.disponible === false;
               const isReserved = activeRes?.statut === "CONFIRMEE" || isRiadEntierReserved;
               const isPending = activeRes?.statut === "EN_ATTENTE";
 
@@ -500,10 +574,11 @@ export default function RiadDetailPage({ params }) {
                     overflow: "hidden",
                     background: "#fff",
                     boxShadow: "var(--shadow-sm)",
+                    opacity: isHostUnavailable ? 0.75 : 1,
                     transition: "transform 0.2s"
                   }}
-                  onMouseEnter={(e) => { if (!isReserved && !isPending) e.currentTarget.style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={(e) => { if (!isReserved && !isPending) e.currentTarget.style.transform = "translateY(0)"; }}
+                  onMouseEnter={(e) => { if (!isReserved && !isPending && !isHostUnavailable) e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={(e) => { if (!isReserved && !isPending && !isHostUnavailable) e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   {chPhotoUrl ? (
                     <div style={{ width: "220px", background: `url(${chPhotoUrl}) center/cover no-repeat`, flexShrink: 0 }} />
@@ -516,6 +591,16 @@ export default function RiadDetailPage({ params }) {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                         <h3 style={{ fontSize: "1.2rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>{ch.nomChambre}</h3>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          {isHostUnavailable ? (
+                            <span style={{ fontSize: "0.78rem", background: "rgba(100,116,139,0.12)", color: "#64748b", padding: "4px 12px", borderRadius: "20px", fontWeight: 600 }}>
+                              🚫 {t("room_unavailable_badge")}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: "0.78rem", background: "rgba(16,185,129,0.1)", color: "#10b981", padding: "4px 12px", borderRadius: "20px", fontWeight: 600 }}>
+                              ✅ {t("room_available_badge")}
+                            </span>
+                          )}
+
                           {isReserved && (
                             <span style={{ fontSize: "0.78rem", background: "rgba(239,68,68,0.1)", color: "#ef4444", padding: "4px 12px", borderRadius: "20px", fontWeight: 600 }}>
                               🔒 {t("status_confirmed")}
@@ -538,7 +623,24 @@ export default function RiadDetailPage({ params }) {
                         {ch.prixParNuit} MAD <span style={{ fontSize: "0.85rem", fontWeight: 400, color: "var(--text-secondary)" }}>/ {t("per_night")}</span>
                       </strong>
                       
-                      {isReserved ? (
+                      {isHostUnavailable ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="btn"
+                          style={{
+                            padding: "10px 24px",
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            background: "#e2e8f0",
+                            color: "#94a3b8",
+                            cursor: "not-allowed",
+                            border: "none"
+                          }}
+                        >
+                          {t("room_unavailable_badge")}
+                        </button>
+                      ) : isReserved ? (
                         <button
                           type="button"
                           disabled
@@ -590,6 +692,7 @@ export default function RiadDetailPage({ params }) {
           </div>
         )}
       </div>
+
 
       {/* Témoignages */}
       <div style={{ borderTop: "1px solid var(--border)", paddingTop: "32px", marginBottom: "40px" }}>

@@ -14,6 +14,9 @@ public interface ChambreService {
     // Obtenir la liste des chambres d'un Riad
     List<Chambre> obtenirChambresRiad(UUID riadId);
 
+    // Obtenir la liste des chambres d'un Riad avec filtrage optionnel de disponibilité
+    List<Chambre> obtenirChambresRiad(UUID riadId, Boolean disponibleOnly);
+
     // Modifier la disponibilité d'une chambre (Propriétaire)
     Chambre modifierDisponibilite(UUID chambreId, Boolean disponible, UUID proprietaireId);
 }

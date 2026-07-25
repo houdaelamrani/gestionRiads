@@ -102,17 +102,18 @@ export default function ClientCatalogue() {
 
   // Filtrage avancé côté client
   const filteredRiadsList = riads.filter((riad) => {
+    const availableChambres = riad.chambres?.filter((c) => c.disponible !== false) || [];
     if (maxBudget) {
       const budgetLimit = parseFloat(maxBudget);
-      const minPrice = riad.chambres?.length > 0
-        ? Math.min(...riad.chambres.map((c) => c.prixParNuit))
+      const minPrice = availableChambres.length > 0
+        ? Math.min(...availableChambres.map((c) => c.prixParNuit))
         : riad.prixRiadEntier;
       if (minPrice > budgetLimit) return false;
     }
     if (guests) {
       const requiredCapacity = parseInt(guests);
-      if (riad.chambres?.length > 0) {
-        const hasCapacity = riad.chambres.some((c) => c.capacite >= requiredCapacity);
+      if (availableChambres.length > 0) {
+        const hasCapacity = availableChambres.some((c) => c.capacite >= requiredCapacity);
         if (!hasCapacity) return false;
       } else if (riad.capaciteMaximale && riad.capaciteMaximale < requiredCapacity) {
         return false;
@@ -120,6 +121,7 @@ export default function ClientCatalogue() {
     }
     return true;
   });
+
 
   if (loading) {
     return (

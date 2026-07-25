@@ -29,12 +29,15 @@ public class ChambreController {
         return new ResponseEntity<>(chambre, HttpStatus.CREATED);
     }
 
-    // 2. Récupérer toutes les chambres d'un Riad spécifique (Public)
+    // 2. Récupérer les chambres d'un Riad spécifique (Public) avec filtrage optionnel disponibleOnly
     @GetMapping("/api/riads/{riadId}/chambres")
-    public ResponseEntity<List<Chambre>> obtenirChambresRiad(@PathVariable UUID riadId) {
-        List<Chambre> chambres = chambreService.obtenirChambresRiad(riadId);
+    public ResponseEntity<List<Chambre>> obtenirChambresRiad(
+            @PathVariable UUID riadId,
+            @RequestParam(value = "disponibleOnly", required = false) Boolean disponibleOnly) {
+        List<Chambre> chambres = chambreService.obtenirChambresRiad(riadId, disponibleOnly);
         return ResponseEntity.ok(chambres);
     }
+
 
     // 3. Modifier la disponibilité d'une chambre (Propriétaire)
     @PutMapping("/api/chambres/{chambreId}/disponibilite")
