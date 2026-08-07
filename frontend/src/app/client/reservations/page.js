@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLanguage } from "../../../lib/LanguageContext";
-
-const API_BASE = "http://localhost:8080";
+import { API_BASE } from "../../../lib/api.js";
 
 const statutBadge = {
   EN_ATTENTE: { color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },

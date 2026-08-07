@@ -1,6 +1,18 @@
+# Frontend dependencies & build
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*
+
 # Backend build folder
 backend/target/
 target/
+
+# Scratch & temp files
+scratch/
+postgres-err.txt
+postgres-out.txt
+*.log
 
 # IDE configs
 .idea/
@@ -8,11 +20,6 @@ target/
 *.iml
 *.ipr
 *.iws
-
-# Logs and temp files
-*.log
-postgres-err.txt
-postgres-out.txt
 
 # OS metadata
 .DS_Store

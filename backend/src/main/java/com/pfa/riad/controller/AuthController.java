@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}) // Autoriser le port par défaut de Next.js pour éviter les erreurs CORS
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;

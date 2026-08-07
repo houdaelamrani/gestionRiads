@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE } from "@/lib/api";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -49,7 +51,7 @@ export default function Register() {
 
     try {
       // Appel API vers le service d'authentification
-      const response = await fetch("http://localhost:8080/api/auth/inscription", {
+      const response = await fetch(`${API_BASE}/api/auth/inscription`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

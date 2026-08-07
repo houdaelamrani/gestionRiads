@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
+@CrossOrigin(origins = "*")
 public class PhotoController {
 
     private final PhotoService photoService;
@@ -36,6 +36,26 @@ public class PhotoController {
             @PathVariable UUID chambreId,
             @RequestHeader("X-User-Id") UUID proprietaireId) {
         Photo photo = photoService.ajouterPhotoChambre(file, chambreId, proprietaireId);
+        return new ResponseEntity<>(photo, HttpStatus.CREATED);
+    }
+
+    // 2b. Ajouter une photo via URL pour un Riad (Propriétaire)
+    @PostMapping("/api/riads/{riadId}/photos/url")
+    public ResponseEntity<Photo> ajouterPhotoRiadUrl(
+            @RequestParam("url") String url,
+            @PathVariable UUID riadId,
+            @RequestHeader("X-User-Id") UUID proprietaireId) {
+        Photo photo = photoService.ajouterPhotoRiadUrl(url, riadId, proprietaireId);
+        return new ResponseEntity<>(photo, HttpStatus.CREATED);
+    }
+
+    // 2c. Ajouter une photo via URL pour une Chambre (Propriétaire)
+    @PostMapping("/api/chambres/{chambreId}/photos/url")
+    public ResponseEntity<Photo> ajouterPhotoChambreUrl(
+            @RequestParam("url") String url,
+            @PathVariable UUID chambreId,
+            @RequestHeader("X-User-Id") UUID proprietaireId) {
+        Photo photo = photoService.ajouterPhotoChambreUrl(url, chambreId, proprietaireId);
         return new ResponseEntity<>(photo, HttpStatus.CREATED);
     }
 

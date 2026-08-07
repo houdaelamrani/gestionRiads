@@ -84,4 +84,43 @@ public class ChambreServiceImpl implements ChambreService {
         // 4. Sauvegarder
         return chambreRepository.save(chambre);
     }
+
+    @Override
+    public void supprimerChambre(UUID chambreId, UUID proprietaireId) {
+        Chambre chambre = chambreRepository.findById(chambreId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
+        if (!chambre.getRiad().getProprietaire().getId().equals(proprietaireId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
+        }
+        chambreRepository.delete(chambre);
+    }
+
+    @Override
+    public Chambre modifierPrixEtCapacite(UUID chambreId, java.math.BigDecimal prixParNuit, Integer capacite, UUID proprietaireId) {
+        Chambre chambre = chambreRepository.findById(chambreId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
+        if (!chambre.getRiad().getProprietaire().getId().equals(proprietaireId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
+        }
+        if (prixParNuit != null) chambre.setPrixParNuit(prixParNuit);
+        if (capacite != null) chambre.setCapacite(capacite);
+        return chambreRepository.save(chambre);
+    }
+
+    @Override
+    public Chambre modifierChambre(UUID chambreId, ChambreRequest request, Boolean disponible, UUID proprietaireId) {
+        Chambre chambre = chambreRepository.findById(chambreId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
+        if (!chambre.getRiad().getProprietaire().getId().equals(proprietaireId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
+        }
+        if (request.getNomChambre() != null) chambre.setNomChambre(request.getNomChambre());
+        if (request.getTypeChambre() != null) chambre.setTypeChambre(request.getTypeChambre());
+        if (request.getPrixParNuit() != null) chambre.setPrixParNuit(request.getPrixParNuit());
+        if (request.getCapacite() != null) chambre.setCapacite(request.getCapacite());
+        if (request.getDescription() != null) chambre.setDescription(request.getDescription());
+        if (disponible != null) chambre.setDisponible(disponible);
+
+        return chambreRepository.save(chambre);
+    }
 }

@@ -19,4 +19,13 @@ public interface ChambreService {
 
     // Modifier la disponibilité d'une chambre (Propriétaire)
     Chambre modifierDisponibilite(UUID chambreId, Boolean disponible, UUID proprietaireId);
+
+    // Supprimer une chambre (Propriétaire)
+    void supprimerChambre(UUID chambreId, UUID proprietaireId);
+
+    // Modifier le tarif et la capacité d'une chambre (Propriétaire)
+    Chambre modifierPrixEtCapacite(UUID chambreId, java.math.BigDecimal prixParNuit, Integer capacite, UUID proprietaireId);
+
+    // Modifier une chambre complète (Nom, Type, Tarif, Capacité, Description, Disponibilité)
+    Chambre modifierChambre(UUID chambreId, ChambreRequest request, Boolean disponible, UUID proprietaireId);
 }

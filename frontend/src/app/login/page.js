@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "../../lib/LanguageContext";
+import { API_BASE } from "@/lib/api";
 
 export default function Login() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function Login() {
 
     try {
       // Appel API vers le service d'authentification
-      const response = await fetch("http://localhost:8080/api/auth/connexion", {
+      const response = await fetch(`${API_BASE}/api/auth/connexion`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

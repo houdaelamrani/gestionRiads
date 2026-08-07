@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 @RequiredArgsConstructor
 public class RiadServiceImpl implements RiadService {
 
@@ -119,5 +120,25 @@ public class RiadServiceImpl implements RiadService {
 
         // 3. Sauvegarder
         return riadRepository.save(riad);
+    }
+
+    @Override
+    public Riad modifierServicesEtDetails(UUID riadId, String nom, String adresse, String description, java.math.BigDecimal prixRiadEntier, Boolean hasSpa, Boolean hasHammam, Boolean hasTraiteur, UUID proprietaireId) {
+        Riad riad = riadRepository.findById(riadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riad non trouvé."));
+
+        if (riad.getProprietaire() == null && proprietaireId != null) {
+            riad.setProprietaire(utilisateurRepository.findById(proprietaireId).orElse(null));
+        }
+
+        if (nom != null && !nom.isBlank()) riad.setNom(nom);
+        if (adresse != null && !adresse.isBlank()) riad.setAdresse(adresse);
+        if (description != null) riad.setDescription(description);
+        if (prixRiadEntier != null) riad.setPrixRiadEntier(prixRiadEntier);
+        if (hasSpa != null) riad.setHasSpa(hasSpa);
+        if (hasHammam != null) riad.setHasHammam(hasHammam);
+        if (hasTraiteur != null) riad.setHasTraiteur(hasTraiteur);
+
+        return riadRepository.saveAndFlush(riad);
     }
 }

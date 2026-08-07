@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { mapPhotoUrl } from "../lib/api.js";
+import { mapPhotoUrl, API_BASE } from "../lib/api.js";
 import { useLanguage } from "../lib/LanguageContext";
 import { getNotifications, markNotificationsAsRead, getUnreadCount } from "../lib/NotificationSystem";
-
-const API_BASE = "http://localhost:8080";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
@@ -24,7 +22,8 @@ export default function Home() {
   const [guests, setGuests] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
 
-  // États pour notifications
+  // États pour navigation et notifications
+  const [activeNavTab, setActiveNavTab] = useState("riads");
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -154,97 +153,107 @@ export default function Home() {
         </a>
         <ul className="nav-links">
           <li>
-            <a href="#riads" className="nav-item active">
+            <a
+              href="#riads"
+              className={`nav-item ${activeNavTab === "riads" ? "active" : ""}`}
+              onClick={() => setActiveNavTab("riads")}
+            >
               {t("nav_riads")}
             </a>
           </li>
           <li>
-            <a href="#comment" className="nav-item">
+            <a
+              href="#comment"
+              className={`nav-item ${activeNavTab === "services" ? "active" : ""}`}
+              onClick={() => setActiveNavTab("services")}
+            >
               {t("nav_services")}
             </a>
           </li>
         </ul>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           
-          {/* Cloche de notifications */}
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                if (!showNotifications) markNotificationsAsRead();
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "1.2rem",
-                cursor: "pointer",
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
-                color: "var(--text-secondary)"
-              }}
-            >
-              🔔
-              {unreadCount > 0 && (
-                <span style={{
-                  position: "absolute",
-                  top: "-4px",
-                  right: "-4px",
-                  background: "#ef4444",
-                  color: "white",
-                  borderRadius: "50%",
-                  width: "16px",
-                  height: "16px",
-                  fontSize: "0.65rem",
-                  fontWeight: 700,
+          {/* Cloche de notifications (Affichée uniquement si le client est connecté/inscrit) */}
+          {currentUser && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  if (!showNotifications) markNotificationsAsRead();
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.2rem",
+                  cursor: "pointer",
+                  position: "relative",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center"
-                }}>
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div style={{
-                position: "absolute",
-                top: "35px",
-                right: "0",
-                width: "290px",
-                backgroundColor: "#ffffff",
-                borderRadius: "12px",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-                border: "1px solid var(--border)",
-                zIndex: 1000,
-                maxHeight: "320px",
-                overflowY: "auto",
-                padding: "10px 0"
-              }}>
-                <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: "0.85rem", color: "var(--text-primary)" }}>
-                  {language === "en" ? "Notifications" : "Notifications"}
-                </div>
-                {notifications.length === 0 ? (
-                  <div style={{ padding: "20px 16px", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.82rem" }}>
-                    {language === "en" ? "No new notifications" : "Aucune notification"}
-                  </div>
-                ) : (
-                  notifications.map((n) => (
-                    <div key={n.id} style={{
-                      padding: "12px 16px",
-                      borderBottom: "1px solid var(--gray-light)",
-                      fontSize: "0.8rem",
-                      lineHeight: "1.4",
-                      backgroundColor: n.read ? "transparent" : "#f0f9ff",
-                      color: "var(--text-primary)"
-                    }}>
-                      {n.message}
-                    </div>
-                  ))
+                  color: "var(--text-secondary)"
+                }}
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: "absolute",
+                    top: "-4px",
+                    right: "-4px",
+                    background: "#ef4444",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "16px",
+                    height: "16px",
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    {unreadCount}
+                  </span>
                 )}
-              </div>
-            )}
-          </div>
+              </button>
+
+              {showNotifications && (
+                <div style={{
+                  position: "absolute",
+                  top: "35px",
+                  right: "0",
+                  width: "290px",
+                  backgroundColor: "#ffffff",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                  border: "1px solid var(--border)",
+                  zIndex: 1000,
+                  maxHeight: "320px",
+                  overflowY: "auto",
+                  padding: "10px 0"
+                }}>
+                  <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: "0.85rem", color: "var(--text-primary)" }}>
+                    {language === "en" ? "Notifications" : "Notifications"}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "20px 16px", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.82rem" }}>
+                      {language === "en" ? "No new notifications" : "Aucune notification"}
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div key={n.id} style={{
+                        padding: "12px 16px",
+                        borderBottom: "1px solid var(--gray-light)",
+                        fontSize: "0.8rem",
+                        lineHeight: "1.4",
+                        backgroundColor: n.read ? "transparent" : "#f0f9ff",
+                        color: "var(--text-primary)"
+                      }}>
+                        {n.message}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Lang Selector */}
           <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: "20px", padding: "2px", backgroundColor: "var(--bg-secondary)" }}>
@@ -309,6 +318,21 @@ export default function Home() {
                   {t("espace_client")}
                 </Link>
               )}
+              {(currentUser.role === "PROPRIETAIRE" || currentUser.role === "ADMIN") && (
+                <Link
+                  href="/proprietaire/dashboard"
+                  className="btn btn-secondary"
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "0.85rem",
+                    border: "1px solid var(--terracotta)",
+                    color: "var(--terracotta)",
+                    fontWeight: 700
+                  }}
+                >
+                  📊 Tableau de Bord Propriétaire
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 className="btn btn-secondary"
@@ -324,6 +348,21 @@ export default function Home() {
             </>
           ) : (
             <>
+              <Link
+                href="/proprietaire"
+                style={{
+                  padding: "8px 14px",
+                  fontSize: "0.82rem",
+                  color: "var(--terracotta)",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px"
+                }}
+              >
+                🏛️ Espace Propriétaire
+              </Link>
               <Link
                 href="/login"
                 className="btn btn-secondary"

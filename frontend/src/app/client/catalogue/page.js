@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { mapPhotoUrl } from "../../../lib/api.js";
+import { mapPhotoUrl, API_BASE } from "../../../lib/api.js";
 import { useLanguage } from "../../../lib/LanguageContext";
-
-const API_BASE = "http://localhost:8080";
 
 export default function ClientCatalogue() {
   const router = useRouter();

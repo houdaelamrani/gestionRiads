@@ -18,6 +18,7 @@ import java.util.UUID;
 public class UtilisateurServiceImpl implements UtilisateurService {
 
     private final UtilisateurRepository utilisateurRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Override
     public List<Utilisateur> obtenirTousLesUtilisateurs(UUID adminId) {
@@ -47,6 +48,22 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Statut utilisateur invalide.");
         }
+    }
+
+    @Override
+    @Transactional
+    public Utilisateur modifierProfil(UUID userId, String nom, String prenom, String telephone, String motDePasse) {
+        Utilisateur user = utilisateurRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur non trouvé."));
+
+        if (nom != null && !nom.trim().isEmpty()) user.setNom(nom.trim());
+        if (prenom != null && !prenom.trim().isEmpty()) user.setPrenom(prenom.trim());
+        if (telephone != null) user.setTelephone(telephone.trim());
+        if (motDePasse != null && !motDePasse.trim().isEmpty() && motDePasse.length() >= 6) {
+            user.setMotDePasse(passwordEncoder.encode(motDePasse.trim()));
+        }
+
+        return utilisateurRepository.save(user);
     }
 
     private void validerAdmin(UUID adminId) {

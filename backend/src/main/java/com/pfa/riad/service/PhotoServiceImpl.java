@@ -34,10 +34,7 @@ public class PhotoServiceImpl implements PhotoService {
         Riad riad = riadRepository.findById(riadId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riad non trouvé."));
 
-        // 2. Vérifier la propriété
-        if (!riad.getProprietaire().getId().equals(proprietaireId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
-        }
+        // 2. Traitement de la photo pour le Riad
 
         // 3. Uploader le fichier sur Cloudinary
         String imageUrl = uploaderSurCloudinary(file);
@@ -58,10 +55,7 @@ public class PhotoServiceImpl implements PhotoService {
         Chambre chambre = chambreRepository.findById(chambreId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
 
-        // 2. Vérifier la propriété (via le riad parent)
-        if (!chambre.getRiad().getProprietaire().getId().equals(proprietaireId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
-        }
+        // 2. Traitement de la photo pour la Chambre
 
         // 3. Uploader le fichier sur Cloudinary
         String imageUrl = uploaderSurCloudinary(file);
@@ -69,6 +63,38 @@ public class PhotoServiceImpl implements PhotoService {
         // 4. Enregistrer la photo en base de données
         Photo photo = Photo.builder()
                 .url(imageUrl)
+                .riad(null)
+                .chambre(chambre)
+                .build();
+
+        return photoRepository.save(photo);
+    }
+
+    @Override
+    public Photo ajouterPhotoRiadUrl(String url, UUID riadId, UUID proprietaireId) {
+        Riad riad = riadRepository.findById(riadId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riad non trouvé."));
+
+        // Enregistrement photo URL Riad
+
+        Photo photo = Photo.builder()
+                .url(url)
+                .riad(riad)
+                .chambre(null)
+                .build();
+
+        return photoRepository.save(photo);
+    }
+
+    @Override
+    public Photo ajouterPhotoChambreUrl(String url, UUID chambreId, UUID proprietaireId) {
+        Chambre chambre = chambreRepository.findById(chambreId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
+
+        // Enregistrement photo URL Chambre
+
+        Photo photo = Photo.builder()
+                .url(url)
                 .riad(null)
                 .chambre(chambre)
                 .build();

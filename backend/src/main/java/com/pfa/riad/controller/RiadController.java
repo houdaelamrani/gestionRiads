@@ -15,7 +15,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/riads")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
+@CrossOrigin(origins = "*")
 public class RiadController {
 
     private final RiadService riadService;
@@ -78,5 +78,53 @@ public class RiadController {
             @RequestHeader("X-User-Id") UUID adminId) {
         Riad riad = riadService.rejeterRiad(id, adminId);
         return ResponseEntity.ok(riad);
+    }
+
+    // 8. Modifier les détails et les services additionnels du Riad (Propriétaire)
+    @PutMapping("/{id}/services")
+    public ResponseEntity<Riad> modifierServicesEtDetails(
+            @PathVariable UUID id,
+            @RequestBody(required = false) java.util.Map<String, Object> body,
+            @RequestParam(value = "nom", required = false) String nom,
+            @RequestParam(value = "adresse", required = false) String adresse,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "prixRiadEntier", required = false) java.math.BigDecimal prixRiadEntier,
+            @RequestParam(value = "hasSpa", required = false) Boolean hasSpa,
+            @RequestParam(value = "hasHammam", required = false) Boolean hasHammam,
+            @RequestParam(value = "hasTraiteur", required = false) Boolean hasTraiteur,
+            @RequestHeader(value = "X-User-Id", required = false) UUID proprietaireId) {
+
+        if (body != null) {
+            if (body.get("nom") != null) nom = body.get("nom").toString();
+            if (body.get("adresse") != null) adresse = body.get("adresse").toString();
+            if (body.get("description") != null) description = body.get("description").toString();
+            if (body.get("prixRiadEntier") != null && !body.get("prixRiadEntier").toString().isBlank()) {
+                try {
+                    prixRiadEntier = new java.math.BigDecimal(body.get("prixRiadEntier").toString());
+                } catch (Exception ignored) {}
+            }
+            if (body.get("hasSpa") != null) hasSpa = Boolean.parseBoolean(body.get("hasSpa").toString());
+            if (body.get("hasHammam") != null) hasHammam = Boolean.parseBoolean(body.get("hasHammam").toString());
+            if (body.get("hasTraiteur") != null) hasTraiteur = Boolean.parseBoolean(body.get("hasTraiteur").toString());
+        }
+
+        Riad riad = riadService.modifierServicesEtDetails(id, nom, adresse, description, prixRiadEntier, hasSpa, hasHammam, hasTraiteur, proprietaireId);
+        return ResponseEntity.ok(riad);
+    }
+
+    // 9. Modifier un Riad (Alias direct sur /{id})
+    @PutMapping("/{id}")
+    public ResponseEntity<Riad> modifierRiadAlias(
+            @PathVariable UUID id,
+            @RequestBody(required = false) java.util.Map<String, Object> body,
+            @RequestParam(value = "nom", required = false) String nom,
+            @RequestParam(value = "adresse", required = false) String adresse,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "prixRiadEntier", required = false) java.math.BigDecimal prixRiadEntier,
+            @RequestParam(value = "hasSpa", required = false) Boolean hasSpa,
+            @RequestParam(value = "hasHammam", required = false) Boolean hasHammam,
+            @RequestParam(value = "hasTraiteur", required = false) Boolean hasTraiteur,
+            @RequestHeader(value = "X-User-Id", required = false) UUID proprietaireId) {
+        return modifierServicesEtDetails(id, body, nom, adresse, description, prixRiadEntier, hasSpa, hasHammam, hasTraiteur, proprietaireId);
     }
 }

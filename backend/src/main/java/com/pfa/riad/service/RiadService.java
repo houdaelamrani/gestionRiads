@@ -28,4 +28,7 @@ public interface RiadService {
 
     // Rejeter un Riad (Admin)
     Riad rejeterRiad(UUID riadId, UUID adminId);
+
+    // Modifier les détails et les services du Riad (Propriétaire)
+    Riad modifierServicesEtDetails(UUID riadId, String nom, String adresse, String description, java.math.BigDecimal prixRiadEntier, Boolean hasSpa, Boolean hasHammam, Boolean hasTraiteur, UUID proprietaireId);
 }

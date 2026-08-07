@@ -14,6 +14,12 @@ public interface PhotoService {
     // Uploader et enregistrer une photo pour une Chambre
     Photo ajouterPhotoChambre(MultipartFile file, UUID chambreId, UUID proprietaireId);
 
+    // Ajouter une photo via son URL pour un Riad
+    Photo ajouterPhotoRiadUrl(String url, UUID riadId, UUID proprietaireId);
+
+    // Ajouter une photo via son URL pour une Chambre
+    Photo ajouterPhotoChambreUrl(String url, UUID chambreId, UUID proprietaireId);
+
     // Récupérer toutes les photos d'un Riad
     List<Photo> obtenirPhotosRiad(UUID riadId);
 

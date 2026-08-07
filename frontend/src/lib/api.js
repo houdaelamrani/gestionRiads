@@ -2,7 +2,9 @@
  * Configuration globale de l'API Backend.
  * Modifiez cette constante pour changer l'URL du backend dans toute l'application.
  */
-export const API_BASE = "http://localhost:8080";
+export const API_BASE = typeof window !== "undefined"
+  ? `http://${window.location.hostname}:8080`
+  : "http://localhost:8080";
 
 /**
  * Helpers HTTP centralisés avec gestion automatique du header X-User-Id.

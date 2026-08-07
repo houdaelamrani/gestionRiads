@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
+@CrossOrigin(origins = "*")
 public class ChambreController {
 
     private final ChambreService chambreService;
@@ -46,6 +46,37 @@ public class ChambreController {
             @PathVariable UUID chambreId,
             @RequestHeader("X-User-Id") UUID proprietaireId) {
         Chambre chambre = chambreService.modifierDisponibilite(chambreId, disponible, proprietaireId);
+        return ResponseEntity.ok(chambre);
+    }
+
+    // 4. Supprimer une chambre (Propriétaire)
+    @DeleteMapping("/api/chambres/{chambreId}")
+    public ResponseEntity<Void> supprimerChambre(
+            @PathVariable UUID chambreId,
+            @RequestHeader("X-User-Id") UUID proprietaireId) {
+        chambreService.supprimerChambre(chambreId, proprietaireId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 5. Modifier le tarif et la capacité d'une chambre (Propriétaire)
+    @PutMapping("/api/chambres/{chambreId}/tarif")
+    public ResponseEntity<Chambre> modifierTarif(
+            @PathVariable UUID chambreId,
+            @RequestParam(value = "prixParNuit", required = false) java.math.BigDecimal prixParNuit,
+            @RequestParam(value = "capacite", required = false) Integer capacite,
+            @RequestHeader("X-User-Id") UUID proprietaireId) {
+        Chambre chambre = chambreService.modifierPrixEtCapacite(chambreId, prixParNuit, capacite, proprietaireId);
+        return ResponseEntity.ok(chambre);
+    }
+
+    // 6. Modifier entièrement une chambre (Propriétaire)
+    @PutMapping("/api/chambres/{chambreId}")
+    public ResponseEntity<Chambre> modifierChambre(
+            @PathVariable UUID chambreId,
+            @RequestBody ChambreRequest request,
+            @RequestParam(value = "disponible", required = false) Boolean disponible,
+            @RequestHeader("X-User-Id") UUID proprietaireId) {
+        Chambre chambre = chambreService.modifierChambre(chambreId, request, disponible, proprietaireId);
         return ResponseEntity.ok(chambre);
     }
 }

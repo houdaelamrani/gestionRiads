@@ -4,27 +4,28 @@
 -- Nettoyage préalable des tables
 TRUNCATE TABLE avis, paiements, reservation_chambres, reservations, photos, chambres, riads, utilisateurs CASCADE;
 
--- 1. Insertion des Utilisateurs (Administrateur, Propriétaires, Clients)
+-- 1. Insertion des Utilisateurs (Administrateur, Propriétaires par Ville, Clients)
 INSERT INTO utilisateurs (id, nom, prenom, email, mot_de_passe, telephone, role, statut) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'El Amrani', 'houda', 'admin@riad.ma', 'admin123', '+212600000001', 'ADMIN', 'ACTIF'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Alaoui', 'Mustapha', 'owner1@riad.ma', 'owner123', '+212600000002', 'PROPRIETAIRE', 'ACTIF'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Tazi', 'Khadija', 'owner2@riad.ma', 'owner123', '+212600000003', 'PROPRIETAIRE', 'ACTIF'),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'Dupont', 'Jean', 'client1@riad.ma', 'client123', '+33612345678', 'CLIENT', 'ACTIF'),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'Bennani', 'Salma', 'client2@riad.ma', 'client123', '+212611223344', 'CLIENT', 'ACTIF');
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'El Amrani', 'houda', 'admin@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000001', 'ADMIN', 'ACTIF'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Alaoui', 'Mustapha', 'proprietaire@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000002', 'PROPRIETAIRE', 'ACTIF'),
+('76dedb51-3964-45a0-9e55-eddbf0fbed78', 'Elamrani', 'Houda', 'elamranihouda540@gmail.com', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000000', 'PROPRIETAIRE', 'ACTIF'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Tazi', 'Khadija', 'owner2@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000003', 'PROPRIETAIRE', 'ACTIF'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99', 'Idrissi', 'Youssef', 'owner.fes@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000004', 'PROPRIETAIRE', 'ACTIF'),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'Dupont', 'Jean', 'client1@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+33612345678', 'CLIENT', 'ACTIF'),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'Bennani', 'Salma', 'client2@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212611223344', 'CLIENT', 'ACTIF');
 
--- 2. Insertion des Riads (Tous VALIDE, avec services Spa, Traiteur, Hammam)
+-- 2. Insertion des Riads (Séparés strictement par Propriétaire et par Ville)
 INSERT INTO riads (id, nom, description, adresse, ville, proprietaire_id, statut_validation, prix_riad_entier, has_spa, has_traiteur, has_hammam) VALUES
--- Riad A (Marrakech) : Spa: oui, Traiteur: oui, Hammam: oui
+-- Riads de Marrakech (Propriétaire Mustapha Alaoui - proprietaire@riad.ma)
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a66', 'Riad Dar El Bacha', 'Un havre de paix au coeur de la médina de Marrakech avec piscine et toit terrasse.', '12 Rue Dar El Bacha, Médina', 'Marrakech', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'VALIDE', 2500.00, TRUE, TRUE, TRUE),
--- Riad B (Fès) : Spa: non, Traiteur: oui, Hammam: oui
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a77', 'Riad Fès Authentique', 'Riad traditionnel restauré avec zelliges historiques et patio ombragé.', '45 Derb el Miter, Fès El Bali', 'Fès', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'VALIDE', 1800.00, FALSE, TRUE, TRUE),
--- Riad C (Essaouira) : Spa: oui, Traiteur: non, Hammam: oui
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a88', 'Riad Mogador Wave', 'Riad vue sur mer, design moderne mélangé à l artisanat d Essaouira.', '8 Avenue de la Plage, Essaouira', 'Essaouira', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 1200.00, TRUE, FALSE, TRUE),
--- Riad D (Marrakech) : Spa: oui, Traiteur: oui, Hammam: non
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99', 'Riad Cinnamon', 'Riad de charme raffiné, ancienne demeure de marchand d épices entièrement rénovée.', 'Derb el Kadi, Marrakech', 'Marrakech', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'VALIDE', 3000.00, TRUE, TRUE, FALSE),
--- Riad E (Fès) : Spa: oui, Traiteur: oui, Hammam: oui
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', 'Riad Souafine', 'Magnifique demeure historique nichée sur les hauteurs de la médina de Fès.', '14 Derb Souafine, Fès', 'Fès', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 2200.00, TRUE, TRUE, TRUE),
--- Riad F (Essaouira) : Spa: non, Traiteur: oui, Hammam: oui
+
+-- Riads de Fès (Propriétaire Youssef Idrissi - owner.fes@riad.ma)
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a77', 'Riad Fès Authentique', 'Riad traditionnel restauré avec zelliges historiques et patio ombragé.', '45 Derb el Miter, Fès El Bali', 'Fès', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99', 'VALIDE', 1800.00, FALSE, TRUE, TRUE),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', 'Riad Souafine', 'Magnifique demeure historique nichée sur les hauteurs de la médina de Fès.', '14 Derb Souafine, Fès', 'Fès', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99', 'VALIDE', 2200.00, TRUE, TRUE, TRUE),
+
+-- Riads d'Essaouira (Propriétaire Khadija Tazi - owner2@riad.ma)
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a88', 'Riad Mogador Wave', 'Riad vue sur mer, design moderne mélangé à l artisanat d Essaouira.', '8 Avenue de la Plage, Essaouira', 'Essaouira', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 1200.00, TRUE, FALSE, TRUE),
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Riad Baoussala', 'Un riad champêtre hors du temps, calme absolu, idéal pour le repos et le yoga.', 'Ghazoua, Essaouira', 'Essaouira', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 1500.00, FALSE, TRUE, TRUE);
 
 -- 3. Insertion des Chambres
@@ -82,7 +83,15 @@ INSERT INTO photos (id, url, riad_id, chambre_id) VALUES
 
 -- Riad Baoussala
 ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f80', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970617/aqskvqxtotsxib4btkig.jpg', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', NULL),
-('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f81', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970640/gwarp7eop8mlw8snwvlt.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380b30');
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f81', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970640/gwarp7eop8mlw8snwvlt.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380b30'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f08', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970640/gwarp7eop8mlw8snwvlt.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f09', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970648/zw1fdouochvkma354lg3.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f10', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783959443/ovth8kcv4z1xzoqj1z9o.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970640/gwarp7eop8mlw8snwvlt.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f13', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783959443/ovth8kcv4z1xzoqj1z9o.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a09'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f14', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970648/zw1fdouochvkma354lg3.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f15', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970640/gwarp7eop8mlw8snwvlt.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380b21'),
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f16', 'https://res.cloudinary.com/mgmnml6e/image/upload/v1783970648/zw1fdouochvkma354lg3.jpg', NULL, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380b31');
 
 -- 5. Insertion des Réservations
 INSERT INTO reservations (id, client_id, riad_id, date_debut, date_fin, prix_total, statut, riad_entier) VALUES
