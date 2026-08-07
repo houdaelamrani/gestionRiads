@@ -59,16 +59,6 @@ export default function ProprietaireLogin() {
         throw new Error(data.message || (language === "en" ? "Incorrect email or password." : "Email ou mot de passe incorrect."));
       }
 
-      if (data.role !== "PROPRIETAIRE" && data.role !== "ADMIN") {
-        throw new Error(
-          language === "en"
-            ? "Access restricted to Riad Owners / Managers."
-            : "Ce compte n'est pas un compte Propriétaire. Veuillez utiliser l'espace client."
-        );
-      }
-
-      setSuccess(language === "en" ? "Login successful! Redirecting to Dashboard..." : "Connexion réussie ! Redirection vers votre Tableau de Bord...");
-
       localStorage.setItem("token", data.token);
       localStorage.setItem(
         "user",
@@ -82,9 +72,17 @@ export default function ProprietaireLogin() {
         })
       );
 
-      setTimeout(() => {
-        router.push("/proprietaire/dashboard");
-      }, 1000);
+      if (data.role === "PROPRIETAIRE" || data.role === "ADMIN") {
+        setSuccess(language === "en" ? "Login successful! Redirecting to Dashboard..." : "Connexion réussie ! Redirection vers votre Espace Gérant...");
+        setTimeout(() => {
+          router.push("/proprietaire/dashboard");
+        }, 1000);
+      } else {
+        setSuccess(language === "en" ? "Login successful! Redirecting to Client Space..." : "Connexion réussie ! Redirection vers l'Espace Client...");
+        setTimeout(() => {
+          router.push("/");
+        }, 1000);
+      }
     } catch (err) {
       setError(err.message || (language === "en" ? "An error occurred during login." : "Une erreur est survenue lors de la connexion."));
     } finally {

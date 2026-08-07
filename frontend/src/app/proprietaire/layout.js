@@ -1,18 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "../../lib/LanguageContext";
 
-export default function ProprietaireLayout({ children }) {
+function ProprietaireLayoutInner({ children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { language, setLanguage } = useLanguage();
-  const [user, setUser] = useState(null);
-  const currentTab = searchParams.get("tab") || "dashboard";
+  const currentTab = searchParams ? searchParams.get("tab") || "dashboard" : "dashboard";
+
+  // Initialisation synchrone pour afficher la sidebar instantanément sans aucun saut
+  const [user, setUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.role === "PROPRIETAIRE" || parsed.role === "ADMIN")) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const isLoginPage = pathname === "/proprietaire/login" || (typeof window !== "undefined" && window.location.pathname === "/proprietaire/login");
 
   useEffect(() => {
+    if (isLoginPage) return;
+
     const storedUser = localStorage.getItem("user");
     if (!storedUser) {
       router.push("/proprietaire/login");
@@ -23,14 +43,14 @@ export default function ProprietaireLayout({ children }) {
       const u = JSON.parse(storedUser);
       if (u.role !== "PROPRIETAIRE" && u.role !== "ADMIN") {
         alert("Accès réservé aux propriétaires / gérants de Riad.");
-        router.push("/");
+        router.push("/proprietaire/login");
         return;
       }
       setUser(u);
     } catch (e) {
       router.push("/proprietaire/login");
     }
-  }, [router]);
+  }, [router, isLoginPage, pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -38,7 +58,51 @@ export default function ProprietaireLayout({ children }) {
     router.push("/proprietaire/login");
   };
 
-  if (!user) return null;
+  // Si on est sur la page de login, rendre la page sans la sidebar
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // Si non connecté, inviter à se connecter
+  if (!user) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a", color: "#ffffff", fontFamily: "'Outfit', sans-serif", padding: "20px", textAlign: "center" }}>
+        <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>🏰</div>
+        <div style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "8px" }}>Espace Propriétaire - MoroccoRiads</div>
+        <p style={{ fontSize: "0.95rem", color: "#94a3b8", maxWidth: "420px", marginBottom: "24px" }}>
+          Vous n'êtes pas encore connecté à votre compte Gérant. Veuillez vous connecter pour accéder à votre tableau de bord.
+        </p>
+        <Link
+          href="/proprietaire/login"
+          style={{
+            backgroundColor: "var(--terracotta, #d96b43)",
+            color: "#ffffff",
+            padding: "12px 28px",
+            borderRadius: "12px",
+            fontWeight: 800,
+            textDecoration: "none",
+            fontSize: "0.95rem",
+            boxShadow: "0 4px 15px rgba(217, 107, 67, 0.4)"
+          }}
+        >
+          🔑 Se connecter à l'Espace Gérant
+        </Link>
+      </div>
+    );
+  }
+
+  const handleAvatarUpload = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const photoUrl = URL.createObjectURL(file);
+      const updated = { ...(user || {}), photoUrl };
+      localStorage.setItem("user", JSON.stringify(updated));
+      setUser(updated);
+    }
+  };
+
+  const currentHour = typeof window !== "undefined" ? new Date().getHours() : 12;
+  const greeting = currentHour >= 18 || currentHour < 5 ? "Bonsoir" : "Bonjour";
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f8fafc", fontFamily: "'Outfit', sans-serif" }}>
@@ -61,35 +125,16 @@ export default function ProprietaireLayout({ children }) {
         }}
       >
         <div>
-          {/* Header Sidebar & Brand Logo */}
+          {/* Header Sidebar & Brand Logo (Seulement MoroccoRiads) */}
           <div style={{ padding: "28px 24px 22px 24px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            <Link href="/" title="Aller sur le site public MoroccoRiads" style={{ textDecoration: "none" }}>
-              <div style={{ fontSize: "1.55rem", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <Link href="/" title="MoroccoRiads" style={{ textDecoration: "none" }}>
+              <div style={{ fontSize: "1.65rem", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.5px" }}>
                 Morocco<span style={{ color: "var(--terracotta, #d96b43)" }}>Riads</span>
-                <span style={{ fontSize: "0.68rem", backgroundColor: "#0284c7", color: "#ffffff", padding: "2px 6px", borderRadius: "10px", fontWeight: 700 }}>🌐 Public</span>
               </div>
             </Link>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
-              <span
-                style={{
-                  backgroundColor: "rgba(217, 107, 67, 0.15)",
-                  color: "#f97316",
-                  fontSize: "0.7rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.5px",
-                  textTransform: "uppercase",
-                  padding: "4px 10px",
-                  borderRadius: "20px",
-                  border: "1px solid rgba(249, 115, 22, 0.3)",
-                  boxShadow: "0 0 12px rgba(249, 115, 22, 0.15)"
-                }}
-              >
-                🏛️ Portail Gérant PMS
-              </span>
-            </div>
           </div>
 
-          {/* Profil Carte Glassmorphism */}
+          {/* Profil Carte Glassmorphism avec Bonjour / Bonsoir et Photo Modifiable au Survol */}
           <div
             style={{
               padding: "16px 20px",
@@ -103,10 +148,21 @@ export default function ProprietaireLayout({ children }) {
               gap: "12px",
             }}
           >
-            <div
+            {/* Input fichier caché pour modifier la photo en cliquant sur l'icône */}
+            <input
+              type="file"
+              id="sidebar-avatar-input"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handleAvatarUpload}
+            />
+
+            <label
+              htmlFor="sidebar-avatar-input"
+              title="Cliquez pour changer votre photo de profil"
               style={{
-                width: "42px",
-                height: "42px",
+                width: "46px",
+                height: "46px",
                 borderRadius: "50%",
                 background: "linear-gradient(135deg, var(--terracotta, #d96b43) 0%, #b45309 100%)",
                 color: "#ffffff",
@@ -114,19 +170,58 @@ export default function ProprietaireLayout({ children }) {
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 800,
-                fontSize: "1.1rem",
-                boxShadow: "0 4px 12px rgba(217, 107, 67, 0.3)"
+                fontSize: "1.15rem",
+                boxShadow: "0 4px 12px rgba(217, 107, 67, 0.3)",
+                overflow: "hidden",
+                flexShrink: 0,
+                cursor: "pointer",
+                position: "relative",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                const overlay = e.currentTarget.querySelector(".avatar-overlay");
+                if (overlay) overlay.style.opacity = "1";
+              }}
+              onMouseLeave={(e) => {
+                const overlay = e.currentTarget.querySelector(".avatar-overlay");
+                if (overlay) overlay.style.opacity = "0";
               }}
             >
-              {user.prenom ? user.prenom.charAt(0).toUpperCase() : "P"}
-            </div>
-            <div style={{ overflow: "hidden", flex: 1 }}>
-              <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {user.prenom} {user.nom}
+              {user?.photoUrl ? (
+                <img src={user.photoUrl} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                user?.prenom ? user.prenom.charAt(0).toUpperCase() : "H"
+              )}
+
+              {/* Overlay au survol avec icône caméra */}
+              <div
+                className="avatar-overlay"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(0, 0, 0, 0.6)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.9rem",
+                  opacity: 0,
+                  transition: "opacity 0.2s ease",
+                  borderRadius: "50%"
+                }}
+              >
+                📷
               </div>
-              <div style={{ fontSize: "0.72rem", color: "#38bdf8", display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", fontWeight: 700 }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#38bdf8", display: "inline-block" }}></span>
-                📍 Gérant Exclusif par Ville
+            </label>
+
+            <div style={{ overflow: "hidden", flex: 1 }}>
+              <div style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, textTransform: "capitalize" }}>
+                {greeting} 👋
+              </div>
+              <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {user?.prenom || "Houda"} {user?.nom || "El Amrani"}
               </div>
             </div>
           </div>
@@ -207,6 +302,30 @@ export default function ProprietaireLayout({ children }) {
                 </Link>
               </li>
 
+              {/* NOUVELLE PAGE HISTORIQUE RÉSERVATIONS JUSTE APRÈS FICHE RIAD */}
+              <li>
+                <Link
+                  href="/proprietaire/dashboard?tab=historique"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "12px 16px",
+                    borderRadius: "12px",
+                    fontSize: "0.88rem",
+                    fontWeight: currentTab === "historique" ? 800 : 600,
+                    color: currentTab === "historique" ? "#ffffff" : "#94a3b8",
+                    backgroundColor: currentTab === "historique" ? "rgba(217, 107, 67, 0.2)" : "transparent",
+                    borderLeft: currentTab === "historique" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
+                    textDecoration: "none",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>📜</span>
+                  Historique Réservations
+                </Link>
+              </li>
+
               <li style={{ marginTop: "16px" }}>
                 <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", padding: "0 14px", marginBottom: "8px" }}>
                   COMPTE & PARAMÈTRES
@@ -236,8 +355,45 @@ export default function ProprietaireLayout({ children }) {
           </nav>
         </div>
 
-        {/* Footer Sidebar & Logout */}
-        <div style={{ padding: "20px 16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        {/* Footer Sidebar avec Sélecteur de Langue + Déconnexion */}
+        <div style={{ padding: "16px 16px 36px 16px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "12px" }}>
+          
+              <button
+                type="button"
+                onClick={() => setLanguage("fr")}
+                style={{
+                  backgroundColor: language === "fr" ? "var(--terracotta, #d96b43)" : "transparent",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "5px 10px",
+                  fontSize: "0.78rem",
+                  fontWeight: 800,
+                  cursor: "pointer"
+                }}
+              >
+                🇫🇷 Français
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                style={{
+                  backgroundColor: language === "en" ? "var(--terracotta, #d96b43)" : "transparent",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "5px 10px",
+                  fontSize: "0.78rem",
+                  fontWeight: 800,
+                  cursor: "pointer"
+                }}
+              >
+                🇬🇧 English
+              </button>
+            </div>
+          </div>
+
+          {/* Bouton Déconnexion */}
           <button
             onClick={handleLogout}
             style={{
@@ -262,9 +418,9 @@ export default function ProprietaireLayout({ children }) {
         </div>
       </aside>
 
-      {/* ── ZONE DE CONTENU PRINCIPAL AVEC HEADER FIXE HAUT DE GAMME ─────────── */}
+      {/* ── ZONE DE CONTENU PRINCIPAL SANS LE BOUTON ALLER SUR MOROCCORIADS ─────────── */}
       <div style={{ flex: 1, marginLeft: "280px", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        {/* Sticky Header Top Bar */}
+        {/* Header Top Bar Épuré */}
         <header
           style={{
             height: "72px",
@@ -287,35 +443,16 @@ export default function ProprietaireLayout({ children }) {
             <span style={{ fontSize: "0.88rem", color: "var(--terracotta, #d96b43)", fontWeight: 800, textTransform: "capitalize" }}>
               {currentTab === "dashboard" && "📊 Tableau de Bord"}
               {currentTab === "chambres" && "🛏️ Gestion des Chambres"}
-              {currentTab === "riad" && "🏨 Fiche Riad"}
+              {currentTab === "riad" && "🏨 Fiche Riad & Établissements"}
               {currentTab === "nouveau-riad" && "➕ Nouveau Riad"}
+              {currentTab === "historique" && "📜 Historique des Réservations"}
               {currentTab === "parametres" && "⚙️ Paramètres"}
             </span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Link
-              href="/"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#f0f9ff",
-                color: "#0284c7",
-                border: "1px solid #bae6fd",
-                padding: "8px 18px",
-                borderRadius: "20px",
-                fontSize: "0.82rem",
-                fontWeight: 800,
-                textDecoration: "none",
-                transition: "all 0.2s",
-                boxShadow: "0 2px 8px rgba(2, 132, 199, 0.12)"
-              }}
-            >
-              🌐 Aller sur MoroccoRiads
-            </Link>
-            <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>
-              {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            <span style={{ fontSize: "0.85rem", color: "#475569", fontWeight: 700, backgroundColor: "#f1f5f9", padding: "6px 14px", borderRadius: "12px" }}>
+              📅 {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
             </span>
           </div>
         </header>
@@ -324,5 +461,13 @@ export default function ProprietaireLayout({ children }) {
         <main style={{ flex: 1, padding: "36px", maxWidth: "1400px" }}>{children}</main>
       </div>
     </div>
+  );
+}
+
+export default function ProprietaireLayout({ children }) {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#0f172a" }} />}>
+      <ProprietaireLayoutInner>{children}</ProprietaireLayoutInner>
+    </Suspense>
   );
 }

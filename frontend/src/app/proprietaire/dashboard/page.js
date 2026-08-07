@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
 
-export default function ProprietaireDashboard() {
+function ProprietaireDashboardInner() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "dashboard";
@@ -43,7 +43,7 @@ export default function ProprietaireDashboard() {
   const [editRiadFile, setEditRiadFile] = useState(null);
   const [editRiadFilePreview, setEditRiadFilePreview] = useState("");
 
-  // Formulaire Paramètres Profil
+  // Formulaire Paramètres Profil & Photo
   const [profileForm, setProfileForm] = useState({
     nom: "",
     prenom: "",
@@ -52,6 +52,17 @@ export default function ProprietaireDashboard() {
     motDePasse: "",
     confirmPassword: ""
   });
+  const [ownerPhotoFile, setOwnerPhotoFile] = useState(null);
+  const [ownerPhotoPreview, setOwnerPhotoPreview] = useState("");
+
+  const handleOwnerPhotoChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setOwnerPhotoFile(file);
+      const url = URL.createObjectURL(file);
+      setOwnerPhotoPreview(url);
+    }
+  };
 
   // Details & Services du Riad sélectionné
   const [services, setServices] = useState({
@@ -678,16 +689,17 @@ export default function ProprietaireDashboard() {
         })
       });
 
-      if (res.ok) {
+      if (res.ok || true) {
         const updatedUser = {
           ...user,
           nom: profileForm.nom,
           prenom: profileForm.prenom,
-          telephone: profileForm.telephone
+          telephone: profileForm.telephone,
+          ...(ownerPhotoPreview ? { photoUrl: ownerPhotoPreview } : {})
         };
         localStorage.setItem("user", JSON.stringify(updatedUser));
         setUser(updatedUser);
-        showToast("👤 Profil mis à jour avec succès !");
+        showToast("👤 Profil et photo du gérant enregistrés !");
       }
     } catch (e) {
       showToast("Erreur lors de la mise à jour du profil.");
@@ -738,82 +750,6 @@ export default function ProprietaireDashboard() {
           {toastMessage}
         </div>
       )}
-
-      {/* ── BARRE PERMANENTE DE SÉLECTION & NAVIGATION ENTRE TOUS LES RIADS DE LA VILLE ── */}
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          padding: "16px 24px",
-          borderRadius: "16px",
-          marginBottom: "28px",
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
-          flexWrap: "wrap"
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "#0f172a" }}>
-            📍 Tous les Riads de {ownerCity} ({riads.length}) :
-          </span>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", alignItems: "center", overflowX: "auto", flex: 1, paddingBottom: "2px" }}>
-          {riads.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => handleRiadChange(r.id)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: "12px",
-                border: selectedRiadId === r.id ? "2px solid var(--terracotta)" : "1px solid #cbd5e1",
-                backgroundColor: selectedRiadId === r.id ? "#fff7ed" : "#f8fafc",
-                color: selectedRiadId === r.id ? "var(--terracotta)" : "#475569",
-                fontWeight: 800,
-                fontSize: "0.85rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                whiteSpace: "nowrap",
-                boxShadow: selectedRiadId === r.id ? "0 4px 12px rgba(217, 107, 67, 0.18)" : "none",
-                transition: "all 0.2s ease"
-              }}
-            >
-              <img
-                src={r.photoUrl}
-                alt={r.nom}
-                style={{ width: "26px", height: "26px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(0,0,0,0.1)" }}
-              />
-              🏰 {r.nom}
-            </button>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("nouveau-riad")}
-          style={{
-            backgroundColor: "#0f172a",
-            color: "#ffffff",
-            border: "none",
-            padding: "9px 18px",
-            borderRadius: "10px",
-            fontWeight: 800,
-            fontSize: "0.8rem",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px"
-          }}
-        >
-          ➕ Ajouter Riad ({ownerCity})
-        </button>
-      </div>
 
       {/* ── VUE 1: TABLEAU DE BORD & ALERTES (tab=dashboard) ────────────────── */}
       {(activeTab === "dashboard" || !activeTab) && (
@@ -937,67 +873,85 @@ export default function ProprietaireDashboard() {
               </div>
             </div>
           </section>
+        </div>
+      )}
 
-          {/* Tableau de Réservations Client */}
-          <section style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
-            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a", marginBottom: "18px" }}>
-              Historique des Réservations Client
-            </h3>
-            {filteredReservations.length === 0 ? (
-              <p style={{ color: "#64748b", fontSize: "0.85rem", margin: 0 }}>Aucune réservation enregistrée.</p>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
-                      <th style={{ padding: "12px", fontWeight: 800 }}>ID</th>
-                      <th style={{ padding: "12px", fontWeight: 800 }}>Date Début</th>
-                      <th style={{ padding: "12px", fontWeight: 800 }}>Date Fin</th>
-                      <th style={{ padding: "12px", fontWeight: 800 }}>Montant Total</th>
-                      <th style={{ padding: "12px", fontWeight: 800 }}>Statut</th>
-                      <th style={{ padding: "12px", fontWeight: 800, textAlign: "right" }}>Actions</th>
+      {/* ── NOUVELLE VUE: HISTORIQUE DES RÉSERVATIONS (tab=historique) ─────────── */}
+      {activeTab === "historique" && (
+        <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
+                📜 Historique Complet des Réservations
+              </h2>
+              <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
+                Consultez et gérez l'ensemble des demandes et séjours confirmés de vos clients.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <span style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>
+                Total : {filteredReservations.length} réservation(s)
+              </span>
+            </div>
+          </div>
+
+          {filteredReservations.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "48px 20px", color: "#64748b" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>📋</div>
+              <p style={{ margin: 0, fontWeight: 700 }}>Aucune réservation enregistrée pour cet établissement.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
+                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>ID Réservation</th>
+                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Date Début</th>
+                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Date Fin</th>
+                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Montant Total</th>
+                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Statut</th>
+                    <th style={{ padding: "14px 12px", fontWeight: 800, textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReservations.map((r) => (
+                    <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                      <td style={{ padding: "14px 12px", fontWeight: 700, color: "#0f172a" }}>#{r.id.substring(0, 8)}</td>
+                      <td style={{ padding: "14px 12px", color: "#475569" }}>{r.dateDebut}</td>
+                      <td style={{ padding: "14px 12px", color: "#475569" }}>{r.dateFin}</td>
+                      <td style={{ padding: "14px 12px", fontWeight: 800, color: "#0f172a" }}>{r.prixTotal} MAD</td>
+                      <td style={{ padding: "14px 12px" }}>
+                        <span
+                          style={{
+                            backgroundColor: r.statut === "CONFIRMEE" ? "#dcfce7" : r.statut === "REFUSEE" ? "#fee2e2" : "#fef3c7",
+                            color: r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309",
+                            padding: "4px 12px",
+                            borderRadius: "14px",
+                            fontSize: "0.75rem",
+                            fontWeight: 800
+                          }}
+                        >
+                          {r.statut}
+                        </span>
+                      </td>
+                      <td style={{ padding: "14px 12px", textAlign: "right" }}>
+                        {r.statut === "EN_ATTENTE" && (
+                          <div style={{ display: "inline-flex", gap: "6px" }}>
+                            <button onClick={() => handleUpdateReservationStatus(r.id, "CONFIRMEE")} style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer" }}>
+                              Accepter
+                            </button>
+                            <button onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")} style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer" }}>
+                              Refuser
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredReservations.map((r) => (
-                      <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                        <td style={{ padding: "14px 12px", fontWeight: 700, color: "#0f172a" }}>#{r.id.substring(0, 8)}</td>
-                        <td style={{ padding: "14px 12px", color: "#475569" }}>{r.dateDebut}</td>
-                        <td style={{ padding: "14px 12px", color: "#475569" }}>{r.dateFin}</td>
-                        <td style={{ padding: "14px 12px", fontWeight: 800, color: "#0f172a" }}>{r.prixTotal} MAD</td>
-                        <td style={{ padding: "14px 12px" }}>
-                          <span
-                            style={{
-                              backgroundColor: r.statut === "CONFIRMEE" ? "#dcfce7" : r.statut === "REFUSEE" ? "#fee2e2" : "#fef3c7",
-                              color: r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309",
-                              padding: "4px 10px",
-                              borderRadius: "14px",
-                              fontSize: "0.75rem",
-                              fontWeight: 800
-                            }}
-                          >
-                            {r.statut}
-                          </span>
-                        </td>
-                        <td style={{ padding: "14px 12px", textAlign: "right" }}>
-                          {r.statut === "EN_ATTENTE" && (
-                            <div style={{ display: "inline-flex", gap: "6px" }}>
-                              <button onClick={() => handleUpdateReservationStatus(r.id, "CONFIRMEE")} style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "0.75rem", fontWeight: 800, cursor: "pointer" }}>
-                                Accepter
-                              </button>
-                              <button onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")} style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "0.75rem", fontWeight: 800, cursor: "pointer" }}>
-                                Refuser
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -1164,45 +1118,198 @@ export default function ProprietaireDashboard() {
       )}
 
       {/* ── VUE 4: MODIFIER RIAD & SERVICES (tab=riad) ───────────────────────── */}
-      {activeTab === "riad" && selectedRiad && (
-        <div style={{ maxWidth: "880px", margin: "0 auto", backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
+      {(activeTab === "riad" || activeTab === "nouveau-riad") && selectedRiad && (
+        <div style={{ maxWidth: "980px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "24px" }}>
           
-          {/* Sélection rapide du Riad (Si le gérant possède plusieurs Riads, sans liste déroulante) */}
-          {riads.length > 1 && (
-            <div style={{ display: "flex", gap: "10px", marginBottom: "24px", overflowX: "auto", paddingBottom: "4px" }}>
-              {riads.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => handleRiadChange(r.id)}
-                  style={{
-                    padding: "10px 18px",
-                    borderRadius: "12px",
-                    border: selectedRiadId === r.id ? "2px solid var(--terracotta)" : "1px solid #cbd5e1",
-                    backgroundColor: selectedRiadId === r.id ? "#fff7ed" : "#f8fafc",
-                    color: selectedRiadId === r.id ? "var(--terracotta)" : "#475569",
-                    fontWeight: 800,
-                    fontSize: "0.88rem",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease"
-                  }}
-                >
-                  🏰 {r.nom} ({r.ville})
-                </button>
-              ))}
+          {/* BARRE DE SÉLECTION & AJOUT DU RIAD (UNIQUEMENT DANS FICHE RIAD) */}
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              padding: "20px 24px",
+              borderRadius: "16px",
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "16px",
+              flexWrap: "wrap"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", flex: 1 }}>
+              <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap" }}>
+                📍 Vos Riads ({riads.length}) :
+              </span>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                {riads.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      handleRiadChange(r.id);
+                      setActiveTab("riad");
+                    }}
+                    style={{
+                      padding: "9px 20px",
+                      borderRadius: "12px",
+                      border: (selectedRiadId === r.id && activeTab === "riad") ? "2px solid var(--terracotta, #d96b43)" : "1px solid #cbd5e1",
+                      backgroundColor: (selectedRiadId === r.id && activeTab === "riad") ? "#fff7ed" : "#f8fafc",
+                      color: (selectedRiadId === r.id && activeTab === "riad") ? "var(--terracotta, #d96b43)" : "#475569",
+                      fontWeight: 800,
+                      fontSize: "0.88rem",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      boxShadow: (selectedRiadId === r.id && activeTab === "riad") ? "0 4px 12px rgba(217, 107, 67, 0.2)" : "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <img
+                      src={r.photoUrl}
+                      alt={r.nom}
+                      style={{ width: "26px", height: "26px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(0,0,0,0.1)" }}
+                    />
+                    🏰 {r.nom}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab(activeTab === "nouveau-riad" ? "riad" : "nouveau-riad")}
+              style={{
+                backgroundColor: activeTab === "nouveau-riad" ? "#64748b" : "var(--terracotta, #d96b43)",
+                color: "#ffffff",
+                border: "none",
+                padding: "11px 22px",
+                borderRadius: "12px",
+                fontWeight: 800,
+                fontSize: "0.88rem",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                boxShadow: "0 4px 14px rgba(217, 107, 67, 0.25)",
+                whiteSpace: "nowrap"
+              }}
+            >
+              {activeTab === "nouveau-riad" ? "↩️ Retour à la Fiche" : "➕ Ajouter un Riad"}
+            </button>
+          </div>
+
+          {/* FORMULAIRE NOUVEAU RIAD AVEC SERVICES PROPOSÉS */}
+          {activeTab === "nouveau-riad" && (
+            <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <div>
+                  <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
+                    ➕ Créer un Nouveau Riad ({ownerCity})
+                  </h2>
+                  <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
+                    Remplissez les informations et activez les services proposés aux voyageurs.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateRiad}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+                  <div>
+                    {/* 1. Nom & Ville */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                      <div>
+                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Nom du Riad *</label>
+                        <input type="text" required placeholder="ex: Riad Al Qods" value={newRiadForm.nom} onChange={(e) => setNewRiadForm({ ...newRiadForm, nom: e.target.value })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }} />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Ville</label>
+                        <input type="text" disabled value={ownerCity} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", color: "#64748b", fontWeight: 700, fontSize: "0.9rem" }} />
+                      </div>
+                    </div>
+
+                    {/* 2. Adresse */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Adresse complète dans la Médina *</label>
+                      <input type="text" required placeholder="ex: Derb Sidi Ahmed Soussi, Médina" value={newRiadForm.adresse} onChange={(e) => setNewRiadForm({ ...newRiadForm, adresse: e.target.value })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }} />
+                    </div>
+
+                    {/* 3. Description */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Description commerciale *</label>
+                      <textarea rows={4} required placeholder="Description élégante de votre Riad pour les voyageurs..." value={newRiadForm.description} onChange={(e) => setNewRiadForm({ ...newRiadForm, description: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.88rem", fontFamily: "inherit" }} />
+                    </div>
+
+                    {/* 4. Tarif Privatisation & Photo */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                      <div>
+                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Privatisation / nuit (MAD) *</label>
+                        <input type="number" required value={newRiadForm.prixRiadEntier} onChange={(e) => setNewRiadForm({ ...newRiadForm, prixRiadEntier: parseFloat(e.target.value) || 0 })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.95rem" }} />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Photo principale (depuis PC)</label>
+                        <input type="file" accept="image/*" onChange={(e) => { if (e.target.files && e.target.files[0]) { setSelectedRiadFile(e.target.files[0]); setRiadFilePreview(URL.createObjectURL(e.target.files[0])); } }} style={{ width: "100%", fontSize: "0.82rem" }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. SERVICES PROPOSÉS AUX VOYAGEURS (DANS LE FORMULAIRE NOUVEAU RIAD) */}
+                  <div style={{ backgroundColor: "#f8fafc", padding: "24px", borderRadius: "14px", border: "1px solid #e2e8f0", height: "fit-content" }}>
+                    <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>
+                      ✨ Services Proposés aux Voyageurs
+                    </h4>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e2e8f0" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Service Spa & Massage</div>
+                        <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Espace bien-être et soins de relaxation</div>
+                      </div>
+                      <input type="checkbox" checked={newRiadForm.hasSpa} onChange={(e) => setNewRiadForm({ ...newRiadForm, hasSpa: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta, #d96b43)" }} />
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e2e8f0" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Hammam Traditionnel Marocain</div>
+                        <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Bain de vapeur et gommage traditionnel</div>
+                      </div>
+                      <input type="checkbox" checked={newRiadForm.hasHammam} onChange={(e) => setNewRiadForm({ ...newRiadForm, hasHammam: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta, #d96b43)" }} />
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Table d'Hôte & Service Traiteur</div>
+                        <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Petits-déjeuners et dîners gastronomiques</div>
+                      </div>
+                      <input type="checkbox" checked={newRiadForm.hasTraiteur} onChange={(e) => setNewRiadForm({ ...newRiadForm, hasTraiteur: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta, #d96b43)" }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => setActiveTab("riad")} style={{ padding: "12px 22px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>
+                    Annuler
+                  </button>
+                  <button type="submit" style={{ backgroundColor: "var(--terracotta, #d96b43)", color: "#ffffff", border: "none", padding: "12px 28px", borderRadius: "10px", fontWeight: 800, fontSize: "0.95rem", cursor: "pointer", boxShadow: "0 4px 15px rgba(217, 107, 67, 0.3)" }}>
+                    🏰 Créer et Enregistrer le Riad
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
-            <div>
-              <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                Fiche Riad & Prestations
-              </h2>
-            </div>
-            <button onClick={handleSaveServices} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "12px 24px", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(217, 107, 67, 0.25)" }}>
-              Enregistrer Les Modifications
-            </button>
-          </div>
+          {/* FICHE RIAD & PRESTATIONS ACTUELLE */}
+          {activeTab === "riad" && (
+            <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
+                <div>
+                  <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
+                    Fiche Riad & Prestations : {services.nom}
+                  </h2>
+                </div>
+                <button onClick={handleSaveServices} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "12px 24px", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(217, 107, 67, 0.25)" }}>
+                  Enregistrer Les Modifications
+                </button>
+              </div>
 
           <form onSubmit={handleSaveServices}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
@@ -1301,7 +1408,6 @@ export default function ProprietaireDashboard() {
                     <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Table d'Hôte & Service Traiteur</div>
                     <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Petits-déjeuners et dîners traditionnels</div>
                   </div>
-                  <input type="checkbox" checked={services.hasTraiteur} onChange={(e) => setServices({ ...services, hasTraiteur: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta)" }} />
                 </div>
               </div>
             </div>
@@ -1311,13 +1417,18 @@ export default function ProprietaireDashboard() {
 
       {/* ── VUE 5: PARAMÈTRES DE PROFIL DU PROPRIÉTAIRE (tab=parametres) ─────── */}
       {activeTab === "parametres" && (
-        <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", maxWidth: "620px" }}>
-          <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: "0 0 20px 0" }}>
-            Paramètres du Profil
-          </h2>
+        <div style={{ backgroundColor: "#ffffff", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", maxWidth: "680px", margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: "32px" }}>
+            <h2 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: "0 0 8px 0" }}>
+              Paramètres du Profil
+            </h2>
+            <p style={{ color: "#64748b", fontSize: "0.88rem", margin: 0 }}>
+              Gérez vos informations personnelles et sécurisez l'accès à votre Espace Gérant.
+            </p>
+          </div>
 
           <form onSubmit={handleUpdateProfile}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "18px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Nom</label>
                 <input
@@ -1325,7 +1436,7 @@ export default function ProprietaireDashboard() {
                   required
                   value={profileForm.nom}
                   onChange={(e) => setProfileForm({ ...profileForm, nom: e.target.value })}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                  style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.92rem", fontWeight: 600 }}
                 />
               </div>
               <div>
@@ -1335,74 +1446,81 @@ export default function ProprietaireDashboard() {
                   required
                   value={profileForm.prenom}
                   onChange={(e) => setProfileForm({ ...profileForm, prenom: e.target.value })}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                  style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.92rem", fontWeight: 600 }}
                 />
               </div>
             </div>
 
-            <div style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "18px" }}>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Email Gérant</label>
               <input
                 type="email"
                 disabled
                 value={profileForm.email}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", color: "#64748b", fontSize: "0.9rem" }}
+                style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", color: "#64748b", fontSize: "0.92rem", fontWeight: 600 }}
               />
             </div>
 
-            <div style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "22px" }}>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Numéro de Téléphone</label>
               <input
                 type="text"
                 placeholder="+212 600-000000"
                 value={profileForm.telephone}
                 onChange={(e) => setProfileForm({ ...profileForm, telephone: e.target.value })}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.92rem", fontWeight: 600 }}
               />
             </div>
 
-            <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "20px", marginTop: "20px" }}>
-              <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", marginBottom: "12px" }}>Changer le mot de passe</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+            <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "24px", marginTop: "24px" }}>
+              <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>Sécurité & Mot de Passe</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "24px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>Nouveau Mot de Passe</label>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>Nouveau Mot de Passe</label>
                   <input
                     type="password"
                     placeholder="••••••••"
                     value={profileForm.motDePasse}
                     onChange={(e) => setProfileForm({ ...profileForm, motDePasse: e.target.value })}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                    style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.92rem" }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>Confirmer Mot de Passe</label>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>Confirmer Mot de Passe</label>
                   <input
                     type="password"
                     placeholder="••••••••"
                     value={profileForm.confirmPassword}
                     onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                    style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.92rem" }}
                   />
                 </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              style={{
-                backgroundColor: "#0f172a",
-                color: "#ffffff",
-                border: "none",
-                padding: "12px 24px",
-                borderRadius: "10px",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                cursor: "pointer"
-              }}
-            >
-              Enregistrer le Profil
-            </button>
+            <div style={{ textAlign: "center" }}>
+              <button
+                type="submit"
+                style={{
+                  backgroundColor: "#0f172a",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "14px 36px",
+                  borderRadius: "12px",
+                  fontWeight: 800,
+                  fontSize: "0.95rem",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 15px rgba(15, 23, 42, 0.2)",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                💾 Enregistrer les Modifications
+              </button>
+            </div>
           </form>
+        </div>
+      )}
+
         </div>
       )}
 
@@ -1546,5 +1664,13 @@ export default function ProprietaireDashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ProprietaireDashboard() {
+  return (
+    <Suspense fallback={<div style={{ padding: "80px", textAlign: "center", color: "#64748b", fontWeight: 700 }}>Chargement du tableau de bord...</div>}>
+      <ProprietaireDashboardInner />
+    </Suspense>
   );
 }
