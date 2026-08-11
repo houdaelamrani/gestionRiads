@@ -8,11 +8,14 @@ frontend/.env*
 backend/target/
 target/
 
-# Scratch & temp files
+# Scripts & temporary files
+*.bat
 scratch/
 postgres-err.txt
 postgres-out.txt
 *.log
+task.md
+walkthrough.md
 
 # IDE configs
 .idea/

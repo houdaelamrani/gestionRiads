@@ -1,6 +1,7 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
+  "name": "moroccoriads-frontend",
+  "version": "1.0.0",
+  "author": "Houda El Amrani",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",

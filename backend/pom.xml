@@ -14,7 +14,15 @@
     <artifactId>riad-management</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>riad-management</name>
-    <description>Système de gestion des Riads au Maroc - Backend Spring Boot</description>
+    <developers>
+        <developer>
+            <name>Houda El Amrani</name>
+            <email>elamranihouda540@gmail.com</email>
+            <roles>
+                <role>Lead Developer</role>
+            </roles>
+        </developer>
+    </developers>
     
     <properties>
         <java.version>17</java.version>
