@@ -12,56 +12,35 @@ function ProprietaireLayoutInner({ children }) {
   const { language, setLanguage } = useLanguage();
   const currentTab = searchParams ? searchParams.get("tab") || "dashboard" : "dashboard";
 
-  // Initialisation synchrone pour afficher la sidebar instantanément sans aucun saut
-  const [user, setUser] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("user");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && (parsed.role === "PROPRIETAIRE" || parsed.role === "ADMIN")) {
-            return parsed;
-          }
-        }
-      } catch (e) {}
-    }
-    return null;
-  });
-
-  const isLoginPage = pathname === "/proprietaire/login" || (typeof window !== "undefined" && window.location.pathname === "/proprietaire/login");
+  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    if (isLoginPage) return;
+    setMounted(true);
 
     const storedUser = localStorage.getItem("user");
     if (!storedUser) {
-      router.push("/proprietaire/login");
+      router.push("/login");
       return;
     }
 
     try {
       const u = JSON.parse(storedUser);
       if (u.role !== "PROPRIETAIRE" && u.role !== "ADMIN") {
-        alert("Accès réservé aux propriétaires / gérants de Riad.");
-        router.push("/proprietaire/login");
+        router.push("/login");
         return;
       }
       setUser(u);
     } catch (e) {
-      router.push("/proprietaire/login");
+      router.push("/login");
     }
-  }, [router, isLoginPage, pathname]);
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    router.push("/proprietaire/login");
+    router.push("/login");
   };
-
-  // Si on est sur la page de login, rendre la page sans la sidebar
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
 
   // Si non connecté, inviter à se connecter
   if (!user) {
@@ -70,10 +49,10 @@ function ProprietaireLayoutInner({ children }) {
         <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>🏰</div>
         <div style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "8px" }}>Espace Propriétaire - MoroccoRiads</div>
         <p style={{ fontSize: "0.95rem", color: "#94a3b8", maxWidth: "420px", marginBottom: "24px" }}>
-          Vous n'êtes pas encore connecté à votre compte Gérant. Veuillez vous connecter pour accéder à votre tableau de bord.
+          Vous n'êtes pas encore connecté. Veuillez vous connecter pour accéder à votre tableau de bord.
         </p>
         <Link
-          href="/proprietaire/login"
+          href="/login"
           style={{
             backgroundColor: "var(--terracotta, #d96b43)",
             color: "#ffffff",
@@ -85,7 +64,7 @@ function ProprietaireLayoutInner({ children }) {
             boxShadow: "0 4px 15px rgba(217, 107, 67, 0.4)"
           }}
         >
-          🔑 Se connecter à l'Espace Gérant
+          🔑 Se connecter
         </Link>
       </div>
     );
@@ -232,26 +211,31 @@ function ProprietaireLayoutInner({ children }) {
               GESTION ÉTABLISSEMENT
             </div>
 
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
               <li>
                 <Link
                   href="/proprietaire/dashboard?tab=dashboard"
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "12px",
+                    gap: "14px",
                     padding: "12px 16px",
                     borderRadius: "12px",
                     fontSize: "0.88rem",
-                    fontWeight: currentTab === "dashboard" ? 800 : 600,
-                    color: currentTab === "dashboard" ? "#ffffff" : "#94a3b8",
-                    backgroundColor: currentTab === "dashboard" ? "rgba(217, 107, 67, 0.2)" : "transparent",
-                    borderLeft: currentTab === "dashboard" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
+                    fontWeight: currentTab === "dashboard" || currentTab === "historique" ? 800 : 600,
+                    color: currentTab === "dashboard" || currentTab === "historique" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
+                    backgroundColor: currentTab === "dashboard" || currentTab === "historique" ? "rgba(217, 107, 67, 0.18)" : "transparent",
+                    borderLeft: currentTab === "dashboard" || currentTab === "historique" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
                     textDecoration: "none",
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>📊</span>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "dashboard" ? 1 : 0.7 }}>
+                    <rect width="7" height="9" x="3" y="3" rx="1" />
+                    <rect width="7" height="5" x="14" y="3" rx="1" />
+                    <rect width="7" height="9" x="14" y="12" rx="1" />
+                    <rect width="7" height="5" x="3" y="16" rx="1" />
+                  </svg>
                   Tableau de Bord
                 </Link>
               </li>
@@ -262,19 +246,24 @@ function ProprietaireLayoutInner({ children }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "12px",
+                    gap: "14px",
                     padding: "12px 16px",
                     borderRadius: "12px",
                     fontSize: "0.88rem",
                     fontWeight: currentTab === "chambres" ? 800 : 600,
-                    color: currentTab === "chambres" ? "#ffffff" : "#94a3b8",
-                    backgroundColor: currentTab === "chambres" ? "rgba(217, 107, 67, 0.2)" : "transparent",
+                    color: currentTab === "chambres" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
+                    backgroundColor: currentTab === "chambres" ? "rgba(217, 107, 67, 0.18)" : "transparent",
                     borderLeft: currentTab === "chambres" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
                     textDecoration: "none",
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>🛏️</span>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "chambres" ? 1 : 0.7 }}>
+                    <path d="M2 4v16" />
+                    <path d="M2 8h18a2 2 0 0 1 2 2v10" />
+                    <path d="M2 17h20" />
+                    <path d="M6 8v9" />
+                  </svg>
                   Gestion des Chambres
                 </Link>
               </li>
@@ -285,44 +274,28 @@ function ProprietaireLayoutInner({ children }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "12px",
+                    gap: "14px",
                     padding: "12px 16px",
                     borderRadius: "12px",
                     fontSize: "0.88rem",
-                    fontWeight: (currentTab === "riad" || currentTab === "nouveau-riad") ? 800 : 600,
-                    color: (currentTab === "riad" || currentTab === "nouveau-riad") ? "#ffffff" : "#94a3b8",
-                    backgroundColor: (currentTab === "riad" || currentTab === "nouveau-riad") ? "rgba(217, 107, 67, 0.2)" : "transparent",
-                    borderLeft: (currentTab === "riad" || currentTab === "nouveau-riad") ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
+                    fontWeight: currentTab === "riad" ? 800 : 600,
+                    color: currentTab === "riad" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
+                    backgroundColor: currentTab === "riad" ? "rgba(217, 107, 67, 0.18)" : "transparent",
+                    borderLeft: currentTab === "riad" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
                     textDecoration: "none",
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>🏨</span>
-                  Fiche Riad & Établissements
-                </Link>
-              </li>
-
-              {/* NOUVELLE PAGE HISTORIQUE RÉSERVATIONS JUSTE APRÈS FICHE RIAD */}
-              <li>
-                <Link
-                  href="/proprietaire/dashboard?tab=historique"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "12px 16px",
-                    borderRadius: "12px",
-                    fontSize: "0.88rem",
-                    fontWeight: currentTab === "historique" ? 800 : 600,
-                    color: currentTab === "historique" ? "#ffffff" : "#94a3b8",
-                    backgroundColor: currentTab === "historique" ? "rgba(217, 107, 67, 0.2)" : "transparent",
-                    borderLeft: currentTab === "historique" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
-                    textDecoration: "none",
-                    transition: "all 0.2s ease"
-                  }}
-                >
-                  <span style={{ fontSize: "1.1rem" }}>📜</span>
-                  Historique Réservations
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "riad" ? 1 : 0.7 }}>
+                    <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+                    <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+                    <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+                    <path d="M10 6h4" />
+                    <path d="M10 10h4" />
+                    <path d="M10 14h4" />
+                    <path d="M10 18h4" />
+                  </svg>
+                  Gestion des Riads
                 </Link>
               </li>
 
@@ -335,33 +308,38 @@ function ProprietaireLayoutInner({ children }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "12px",
+                    gap: "14px",
                     padding: "12px 16px",
                     borderRadius: "12px",
                     fontSize: "0.88rem",
                     fontWeight: currentTab === "parametres" ? 800 : 600,
-                    color: currentTab === "parametres" ? "#ffffff" : "#94a3b8",
-                    backgroundColor: currentTab === "parametres" ? "rgba(217, 107, 67, 0.2)" : "transparent",
+                    color: currentTab === "parametres" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
+                    backgroundColor: currentTab === "parametres" ? "rgba(217, 107, 67, 0.18)" : "transparent",
                     borderLeft: currentTab === "parametres" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
                     textDecoration: "none",
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>⚙️</span>
-                  Paramètres
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "parametres" ? 1 : 0.7 }}>
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  Profil & Paramètres
                 </Link>
               </li>
             </ul>
           </nav>
         </div>
 
-        {/* Footer Sidebar avec Sélecteur de Langue + Déconnexion */}
+        {/* Footer Sidebar avec Sélecteur de Langue (FR / EN) + Déconnexion */}
         <div style={{ padding: "16px 16px 36px 16px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "12px" }}>
-          
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.04)", padding: "4px 8px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ display: "flex", gap: "6px", width: "100%", justifyContent: "center" }}>
               <button
                 type="button"
                 onClick={() => setLanguage("fr")}
                 style={{
+                  flex: 1,
                   backgroundColor: language === "fr" ? "var(--terracotta, #d96b43)" : "transparent",
                   color: "#ffffff",
                   border: "none",
@@ -372,12 +350,13 @@ function ProprietaireLayoutInner({ children }) {
                   cursor: "pointer"
                 }}
               >
-                🇫🇷 Français
+                FR
               </button>
               <button
                 type="button"
                 onClick={() => setLanguage("en")}
                 style={{
+                  flex: 1,
                   backgroundColor: language === "en" ? "var(--terracotta, #d96b43)" : "transparent",
                   color: "#ffffff",
                   border: "none",
@@ -388,12 +367,12 @@ function ProprietaireLayoutInner({ children }) {
                   cursor: "pointer"
                 }}
               >
-                🇬🇧 English
+                EN
               </button>
             </div>
           </div>
 
-          {/* Bouton Déconnexion */}
+          {/* Bouton Déconnexion avec icône élégante */}
           <button
             onClick={handleLogout}
             style={{
@@ -404,8 +383,8 @@ function ProprietaireLayoutInner({ children }) {
               gap: "10px",
               padding: "12px",
               borderRadius: "12px",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              backgroundColor: "rgba(239, 68, 68, 0.08)",
               color: "#fca5a5",
               fontSize: "0.85rem",
               fontWeight: 800,
@@ -413,7 +392,12 @@ function ProprietaireLayoutInner({ children }) {
               transition: "all 0.2s"
             }}
           >
-            🚪 Déconnexion
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" x2="9" y1="12" y2="12" />
+            </svg>
+            Déconnexion
           </button>
         </div>
       </aside>
@@ -441,12 +425,10 @@ function ProprietaireLayoutInner({ children }) {
             <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Espace Propriétaire</span>
             <span style={{ color: "#cbd5e1" }}>/</span>
             <span style={{ fontSize: "0.88rem", color: "var(--terracotta, #d96b43)", fontWeight: 800, textTransform: "capitalize" }}>
-              {currentTab === "dashboard" && "📊 Tableau de Bord"}
-              {currentTab === "chambres" && "🛏️ Gestion des Chambres"}
-              {currentTab === "riad" && "🏨 Fiche Riad & Établissements"}
-              {currentTab === "nouveau-riad" && "➕ Nouveau Riad"}
-              {currentTab === "historique" && "📜 Historique des Réservations"}
-              {currentTab === "parametres" && "⚙️ Paramètres"}
+              {(currentTab === "dashboard" || currentTab === "historique") && "📊 Tableau de Bord Opérationnel"}
+              {currentTab === "chambres" && "🛏️ Gestion Complète des Chambres"}
+              {currentTab === "riad" && "🏨 Gestion des Riads"}
+              {currentTab === "parametres" && "⚙️ Profil & Paramètres"}
             </span>
           </div>
 

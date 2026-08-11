@@ -25,10 +25,6 @@ export default function ClientLayout({ children }) {
       return;
     }
     const user = JSON.parse(userStr);
-    if (user.role !== "CLIENT") {
-      router.push("/");
-      return;
-    }
     setCurrentUser(user);
     setLoading(false);
   }, [router]);
@@ -47,7 +43,7 @@ export default function ClientLayout({ children }) {
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    router.push("/");
+    router.push("/login");
   };
 
   if (loading) {

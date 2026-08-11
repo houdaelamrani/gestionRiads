@@ -1,7 +1,6 @@
 package com.pfa.riad.controller;
 
 import com.pfa.riad.entity.Reservation;
-import com.pfa.riad.entity.Riad;
 import com.pfa.riad.enums.StatutReservation;
 import com.pfa.riad.repository.ReservationRepository;
 import com.pfa.riad.repository.RiadRepository;

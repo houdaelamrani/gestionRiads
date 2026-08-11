@@ -8,20 +8,19 @@ import { useLanguage } from "@/lib/LanguageContext";
 function ProprietaireDashboardInner() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const tabFromUrl = searchParams.get("tab") || "dashboard";
+  const activeTab = searchParams ? searchParams.get("tab") || "dashboard" : "dashboard";
 
-  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [user, setUser] = useState(null);
   const [riads, setRiads] = useState([]);
   const [selectedRiadId, setSelectedRiadId] = useState("");
   const [chambres, setChambres] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [alertes, setAlertes] = useState({ nettoyage: [], arriveesAujourdhui: [], nouvellesReservations: [], stats: {} });
-  const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState("");
   const [selectedCityFilter, setSelectedCityFilter] = useState("Toutes");
+  const [reservationFilter, setReservationFilter] = useState("TOUTES");
 
-  // Modale de confirmation de suppression sur-mesure
+  // Modale de suppression chambre
   const [roomToDelete, setRoomToDelete] = useState(null);
 
   // Formulaire Nouveau Riad
@@ -43,26 +42,15 @@ function ProprietaireDashboardInner() {
   const [editRiadFile, setEditRiadFile] = useState(null);
   const [editRiadFilePreview, setEditRiadFilePreview] = useState("");
 
-  // Formulaire Paramètres Profil & Photo
+  // Formulaire Paramètres Profil
   const [profileForm, setProfileForm] = useState({
-    nom: "",
-    prenom: "",
-    email: "",
-    telephone: "",
+    nom: "El Amrani",
+    prenom: "Houda",
+    email: "elamranihouda540@gmail.com",
+    telephone: "+212 600-000000",
     motDePasse: "",
     confirmPassword: ""
   });
-  const [ownerPhotoFile, setOwnerPhotoFile] = useState(null);
-  const [ownerPhotoPreview, setOwnerPhotoPreview] = useState("");
-
-  const handleOwnerPhotoChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setOwnerPhotoFile(file);
-      const url = URL.createObjectURL(file);
-      setOwnerPhotoPreview(url);
-    }
-  };
 
   // Details & Services du Riad sélectionné
   const [services, setServices] = useState({
@@ -89,29 +77,30 @@ function ProprietaireDashboardInner() {
   const [selectedRoomFile, setSelectedRoomFile] = useState(null);
   const [roomFilePreview, setRoomFilePreview] = useState("");
 
-  // Modale Modification Chambre + Photo disque
+  // Modale Modification Chambre
   const [editingRoom, setEditingRoom] = useState(null);
   const [editingRoomFile, setEditingRoomFile] = useState(null);
   const [editingRoomFilePreview, setEditingRoomFilePreview] = useState("");
 
-  useEffect(() => {
-    setActiveTab(searchParams.get("tab") || "dashboard");
-  }, [searchParams]);
+  const [isSubmittingRoom, setIsSubmittingRoom] = useState(false);
+  const [isSavingRiad, setIsSavingRiad] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      const u = JSON.parse(storedUser);
-      setUser(u);
-      setProfileForm({
-        nom: u.nom || "",
-        prenom: u.prenom || "",
-        email: u.email || "",
-        telephone: u.telephone || "",
-        motDePasse: "",
-        confirmPassword: ""
-      });
-      loadOwnerData(u.id);
+      try {
+        const u = JSON.parse(storedUser);
+        setUser(u);
+        setProfileForm({
+          nom: u.nom || "El Amrani",
+          prenom: u.prenom || "Houda",
+          email: u.email || "elamranihouda540@gmail.com",
+          telephone: u.telephone || "+212 600-000000",
+          motDePasse: "",
+          confirmPassword: ""
+        });
+        loadOwnerData(u.id);
+      } catch (e) {}
     }
   }, []);
 
@@ -120,12 +109,8 @@ function ProprietaireDashboardInner() {
     setTimeout(() => setToastMessage(""), 4000);
   };
 
-  const [ownerCity, setOwnerCity] = useState("Marrakech");
-
   const loadOwnerData = async (ownerId, keepSelectedId = null) => {
-    setLoading(true);
     try {
-      // 1. Charger les Riads du propriétaire + leurs photos
       let dataRiads = [];
       const resRiads = await fetch(`${API_BASE}/api/riads/owner`, {
         headers: { "X-User-Id": ownerId }
@@ -134,19 +119,12 @@ function ProprietaireDashboardInner() {
         dataRiads = await resRiads.json();
       }
 
-      // Pour ce compte gérant, la ville exclusive est TOUJOURS Marrakech
-      const targetCity = "Marrakech";
-      setOwnerCity(targetCity);
-      setNewRiadForm((prev) => ({ ...prev, ville: targetCity }));
-
-      // Charger également les Riads publics de Marrakech pour garantie d'exhaustivité
       let marrakechPublic = [];
       const resMke = await fetch(`${API_BASE}/api/riads/recherche?ville=Marrakech`);
       if (resMke.ok) {
         marrakechPublic = await resMke.json();
       }
 
-      // Fusionner et filtrer STRICTEMENT pour ne conserver QUE les Riads de Marrakech
       const combined = [...dataRiads, ...marrakechPublic];
       const marrakechOnlyMap = new Map();
       combined.forEach((r) => {
@@ -157,7 +135,6 @@ function ProprietaireDashboardInner() {
       const dataRiadsMarrakech = Array.from(marrakechOnlyMap.values());
 
       if (dataRiadsMarrakech.length > 0) {
-        // Charger les photos pour chaque Riad de Marrakech
         const riadsWithPhotos = await Promise.all(
           dataRiadsMarrakech.map(async (r) => {
             try {
@@ -179,7 +156,6 @@ function ProprietaireDashboardInner() {
         setRiads(riadsWithPhotos);
 
         if (riadsWithPhotos.length > 0) {
-          // Conserver l'identifiant du Riad sélectionné en cours (keepSelectedId)
           const activeId = keepSelectedId && riadsWithPhotos.some((r) => r.id === keepSelectedId)
             ? keepSelectedId
             : riadsWithPhotos[0].id;
@@ -202,7 +178,6 @@ function ProprietaireDashboardInner() {
         }
       }
 
-      // 2. Charger toutes les réservations des Riads du propriétaire
       const resResa = await fetch(`${API_BASE}/api/reservations/owner`, {
         headers: { "X-User-Id": ownerId }
       });
@@ -211,7 +186,6 @@ function ProprietaireDashboardInner() {
         setReservations(dataResa);
       }
 
-      // 3. Charger les alertes opérationnelles
       const resAlertes = await fetch(`${API_BASE}/api/proprietaire/alertes`, {
         headers: { "X-User-Id": ownerId }
       });
@@ -220,9 +194,7 @@ function ProprietaireDashboardInner() {
         setAlertes(dataAlertes);
       }
     } catch (err) {
-      console.error("Erreur lors du chargement des données propriétaire :", err);
-    } finally {
-      setLoading(false);
+      console.error("Erreur chargement données propriétaire :", err);
     }
   };
 
@@ -231,8 +203,6 @@ function ProprietaireDashboardInner() {
       const res = await fetch(`${API_BASE}/api/riads/${riadId}/chambres`);
       if (res.ok) {
         const data = await res.json();
-        
-        // Charger les photos pour chaque chambre
         const chambresWithPhotos = await Promise.all(
           data.map(async (ch) => {
             try {
@@ -250,181 +220,34 @@ function ProprietaireDashboardInner() {
             };
           })
         );
-
         setChambres(chambresWithPhotos);
       }
-    } catch (e) {
-      console.error("Erreur lors du chargement des chambres :", e);
+    } catch (err) {
+      console.error("Erreur chargement chambres :", err);
     }
   };
 
-  const handleRiadChange = (rid) => {
-    setSelectedRiadId(rid);
-    const r = riads.find((item) => item.id === rid);
-    if (r) {
-      setServices({
-        nom: r.nom || "",
-        adresse: r.adresse || "",
-        description: r.description || "",
-        prixRiadEntier: r.prixRiadEntier || 0,
-        hasSpa: !!r.hasSpa,
-        hasHammam: !!r.hasHammam,
-        hasTraiteur: !!r.hasTraiteur,
-        photoUrl: r.photoUrl || ""
-      });
-    }
+  const handleSelectRiad = (riad) => {
+    setSelectedRiadId(riad.id);
+    setServices({
+      nom: riad.nom || "",
+      adresse: riad.adresse || "",
+      description: riad.description || "",
+      prixRiadEntier: riad.prixRiadEntier || 0,
+      hasSpa: !!riad.hasSpa,
+      hasHammam: !!riad.hasHammam,
+      hasTraiteur: !!riad.hasTraiteur,
+      photoUrl: riad.photoUrl || ""
+    });
     setEditRiadFile(null);
     setEditRiadFilePreview("");
-    if (user) {
-      loadChambres(rid, user.id);
-    }
+    if (user) loadChambres(riad.id, user.id);
   };
 
-  // Traitement d'approbation ou refus de réservation
-  const handleUpdateReservationStatus = async (reservationId, newStatut) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/reservations/${reservationId}/statut`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": user?.id
-        },
-        body: JSON.stringify({ statut: newStatut })
-      });
-
-      if (res.ok) {
-        showToast(
-          newStatut === "CONFIRMEE"
-            ? "✅ Réservation acceptée avec succès !"
-            : "❌ Réservation refusée."
-        );
-        if (user) loadOwnerData(user.id, selectedRiadId);
-      } else {
-        showToast("Impossible de mettre à jour la réservation.");
-      }
-    } catch (e) {
-      showToast("Erreur lors de la mise à jour.");
-    }
-  };
-
-  // Basculement visibilité / publication d'une chambre
-  const handleToggleDisponibilite = async (chambreId, currentStatus) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/chambres/${chambreId}/disponibilite?disponible=${!currentStatus}`, {
-        method: "PUT",
-        headers: { "X-User-Id": user?.id }
-      });
-      if (res.ok) {
-        showToast(!currentStatus ? "🟢 Chambre publiée sur le site public !" : "🔴 Chambre masquée.");
-        if (selectedRiadId && user) loadChambres(selectedRiadId, user.id);
-      }
-    } catch (e) {
-      showToast("Erreur lors de la modification de la disponibilité.");
-    }
-  };
-
-  // Enregistrement Prestations, Photo, Nom, Tarif & Informations Riad
-  const handleSaveServices = async (e) => {
-    if (e) e.preventDefault();
-    if (!selectedRiadId || !user) return;
-    try {
-      const params = new URLSearchParams({
-        nom: services.nom || "",
-        adresse: services.adresse || "",
-        description: services.description || "",
-        prixRiadEntier: services.prixRiadEntier || 0,
-        hasSpa: !!services.hasSpa,
-        hasHammam: !!services.hasHammam,
-        hasTraiteur: !!services.hasTraiteur
-      });
-
-      const payload = {
-        nom: services.nom || "",
-        adresse: services.adresse || "",
-        description: services.description || "",
-        prixRiadEntier: services.prixRiadEntier || 0,
-        hasSpa: !!services.hasSpa,
-        hasHammam: !!services.hasHammam,
-        hasTraiteur: !!services.hasTraiteur
-      };
-
-      // 1. Appel API PUT unifié (Query Params + Body JSON pour compatibilité maximale)
-      const res = await fetch(`${API_BASE}/api/riads/${selectedRiadId}/services?${params.toString()}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": user.id
-        },
-        body: JSON.stringify(payload)
-      });
-
-      // 2. Si une nouvelle photo a été sélectionnée sur le disque dur
-      if (editRiadFile) {
-        try {
-          const photoFormData = new FormData();
-          photoFormData.append("file", editRiadFile);
-
-          const pRes = await fetch(`${API_BASE}/api/riads/${selectedRiadId}/photos`, {
-            method: "POST",
-            headers: { "X-User-Id": user.id },
-            body: photoFormData
-          });
-
-          if (!pRes.ok) {
-            const cData = new FormData();
-            cData.append("file", editRiadFile);
-            cData.append("upload_preset", "pfa_preset");
-
-            const cRes = await fetch("https://api.cloudinary.com/v1_1/mgmnml6e/image/upload", {
-              method: "POST",
-              body: cData
-            });
-
-            if (cRes.ok) {
-              const cJson = await cRes.json();
-              await fetch(`${API_BASE}/api/riads/${selectedRiadId}/photos/url?url=${encodeURIComponent(cJson.secure_url)}`, {
-                method: "POST",
-                headers: { "X-User-Id": user.id }
-              });
-            }
-          }
-        } catch (photoErr) {
-          console.warn("Mise à jour photo :", photoErr);
-        }
-      }
-
-      // 3. Mise à jour optimiste immédiate dans l'état React
-      setRiads((prevRiads) =>
-        prevRiads.map((r) =>
-          r.id === selectedRiadId
-            ? {
-                ...r,
-                nom: services.nom || r.nom,
-                adresse: services.adresse || r.adresse,
-                description: services.description || r.description,
-                prixRiadEntier: services.prixRiadEntier,
-                hasSpa: services.hasSpa,
-                hasHammam: services.hasHammam,
-                hasTraiteur: services.hasTraiteur,
-                photoUrl: editRiadFilePreview || r.photoUrl
-              }
-            : r
-        )
-      );
-
-      showToast("✨ Nom, Tarif, Photo et Informations enregistrés avec succès !");
-      setEditRiadFile(null);
-      setEditRiadFilePreview("");
-      loadOwnerData(user.id, selectedRiadId);
-    } catch (e) {
-      showToast("✨ Modifications enregistrées !");
-    }
-  };
-
-  // Formulaire Création Riad avec Photo Disque Local
   const handleCreateRiad = async (e) => {
     e.preventDefault();
     if (!user) return;
+    setIsSavingRiad(true);
 
     try {
       let finalPhotoUrl = newRiadForm.photoUrl;
@@ -432,16 +255,18 @@ function ProprietaireDashboardInner() {
       if (selectedRiadFile) {
         const formData = new FormData();
         formData.append("file", selectedRiadFile);
-        formData.append("upload_preset", "pfa_preset");
+        formData.append("nom", newRiadForm.nom);
 
-        const uploadRes = await fetch("https://api.cloudinary.com/v1_1/mgmnml6e/image/upload", {
+        const uploadRes = await fetch(`${API_BASE}/api/upload/local`, {
           method: "POST",
           body: formData
         });
 
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
-          finalPhotoUrl = uploadData.secure_url;
+          if (uploadData.url) {
+            finalPhotoUrl = uploadData.url;
+          }
         }
       }
 
@@ -458,7 +283,8 @@ function ProprietaireDashboardInner() {
       });
 
       if (res.ok) {
-        showToast("🏰 Nouveau Riad créé avec succès !");
+        const created = await res.json();
+        showToast("Riad créé avec succès !");
         setNewRiadForm({
           nom: "",
           ville: "Marrakech",
@@ -472,87 +298,109 @@ function ProprietaireDashboardInner() {
         });
         setSelectedRiadFile(null);
         setRiadFilePreview("");
-        loadOwnerData(user.id);
+        loadOwnerData(user.id, created.id);
+      } else {
+        alert("Erreur lors de la création du Riad.");
       }
-    } catch (e) {
-      showToast("Erreur lors de la création du Riad.");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau lors de la création.");
+    } finally {
+      setIsSavingRiad(false);
     }
   };
 
-  // Etat de soumission rapide pour la création de chambre
-  const [isSubmittingRoom, setIsSubmittingRoom] = useState(false);
+  const handleSaveServices = async (e) => {
+    e.preventDefault();
+    if (!selectedRiadId || !user) return;
+    setIsSavingRiad(true);
 
-  // Formulaire Ajout Chambre avec enregistrement de la photo du disque
+    try {
+      let finalPhotoUrl = services.photoUrl;
+
+      if (editRiadFile) {
+        const formData = new FormData();
+        formData.append("file", editRiadFile);
+        formData.append("nom", services.nom);
+
+        const uploadRes = await fetch(`${API_BASE}/api/upload/local`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            finalPhotoUrl = uploadData.url;
+          }
+        }
+      }
+
+      const res = await fetch(`${API_BASE}/api/riads/${selectedRiadId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": user.id
+        },
+        body: JSON.stringify({
+          ...services,
+          photoUrl: finalPhotoUrl
+        })
+      });
+
+      if (res.ok) {
+        showToast("Informations du Riad mises à jour !");
+        loadOwnerData(user.id, selectedRiadId);
+      } else {
+        alert("Erreur lors de la mise à jour.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau.");
+    } finally {
+      setIsSavingRiad(false);
+    }
+  };
+
   const handleAddRoom = async (e) => {
     e.preventDefault();
-    if (!selectedRiadId || !user || isSubmittingRoom) return;
-
+    if (!selectedRiadId || !user) return;
     setIsSubmittingRoom(true);
 
     try {
-      // 1. Créer la chambre dans Spring Boot
-      const res = await fetch(`${API_BASE}/api/riads/${selectedRiadId}/chambres`, {
+      let finalPhotoUrl = newRoomData.photoUrl;
+
+      if (selectedRoomFile) {
+        const formData = new FormData();
+        formData.append("file", selectedRoomFile);
+        formData.append("nom", newRoomData.nomChambre);
+
+        const uploadRes = await fetch(`${API_BASE}/api/upload/local`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            finalPhotoUrl = uploadData.url;
+          }
+        }
+      }
+
+      const res = await fetch(`${API_BASE}/api/chambres/riad/${selectedRiadId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-User-Id": user.id
         },
         body: JSON.stringify({
-          nomChambre: newRoomData.nomChambre,
-          typeChambre: newRoomData.typeChambre,
-          prixParNuit: newRoomData.prixParNuit,
-          capacite: newRoomData.capacite,
-          description: newRoomData.description || ""
+          ...newRoomData,
+          photoUrl: finalPhotoUrl
         })
       });
 
       if (res.ok) {
-        const createdRoom = await res.json();
-
-        // 2. Si un fichier a été sélectionné depuis le disque local, l'enregistrer dans Spring Boot
-        if (selectedRoomFile) {
-          try {
-            // Upload direct multipart vers le backend Spring Boot
-            const photoFormData = new FormData();
-            photoFormData.append("file", selectedRoomFile);
-
-            const pRes = await fetch(`${API_BASE}/api/chambres/${createdRoom.id}/photos`, {
-              method: "POST",
-              headers: { "X-User-Id": user.id },
-              body: photoFormData
-            });
-
-            if (!pRes.ok) {
-              // Secours : Envoi sur Cloudinary direct si besoin
-              const cData = new FormData();
-              cData.append("file", selectedRoomFile);
-              cData.append("upload_preset", "pfa_preset");
-
-              const cRes = await fetch("https://api.cloudinary.com/v1_1/mgmnml6e/image/upload", {
-                method: "POST",
-                body: cData
-              });
-
-              if (cRes.ok) {
-                const cJson = await cRes.json();
-                await fetch(`${API_BASE}/api/chambres/${createdRoom.id}/photos/url?url=${encodeURIComponent(cJson.secure_url)}`, {
-                  method: "POST",
-                  headers: { "X-User-Id": user.id }
-                });
-              }
-            }
-          } catch (photoErr) {
-            console.error("Erreur lors de l'enregistrement de la photo :", photoErr);
-          }
-        } else if (newRoomData.photoUrl) {
-          // Si une URL de photo par défaut est présente
-          await fetch(`${API_BASE}/api/chambres/${createdRoom.id}/photos/url?url=${encodeURIComponent(newRoomData.photoUrl)}`, {
-            method: "POST",
-            headers: { "X-User-Id": user.id }
-          });
-        }
-
-        showToast("🛏️ Chambre créée avec sa photo !");
         setShowAddRoomModal(false);
         setNewRoomData({
           nomChambre: "",
@@ -564,24 +412,44 @@ function ProprietaireDashboardInner() {
         });
         setSelectedRoomFile(null);
         setRoomFilePreview("");
+        showToast("Nouvelle chambre ajoutée !");
         loadChambres(selectedRiadId, user.id);
       } else {
-        showToast("Erreur lors de la création de la chambre.");
+        alert("Erreur lors de l'ajout de la chambre.");
       }
-    } catch (e) {
-      showToast("Erreur lors de l'ajout de la chambre.");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau.");
     } finally {
       setIsSubmittingRoom(false);
     }
   };
 
-  // Formulaire Modification Chambre avec mise à jour photo du disque
   const handleSaveEditRoom = async (e) => {
     e.preventDefault();
     if (!editingRoom || !user) return;
 
     try {
-      // 1. Mettre à jour les informations de la chambre dans Spring Boot
+      let finalPhotoUrl = editingRoom.photoUrl;
+
+      if (editingRoomFile) {
+        const formData = new FormData();
+        formData.append("file", editingRoomFile);
+        formData.append("nom", editingRoom.nomChambre);
+
+        const uploadRes = await fetch(`${API_BASE}/api/upload/local`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            finalPhotoUrl = uploadData.url;
+          }
+        }
+      }
+
       const res = await fetch(`${API_BASE}/api/chambres/${editingRoom.id}`, {
         method: "PUT",
         headers: {
@@ -589,64 +457,50 @@ function ProprietaireDashboardInner() {
           "X-User-Id": user.id
         },
         body: JSON.stringify({
-          nomChambre: editingRoom.nomChambre,
-          typeChambre: editingRoom.typeChambre,
-          prixParNuit: editingRoom.prixParNuit,
-          capacite: editingRoom.capacite,
-          description: editingRoom.description || ""
+          ...editingRoom,
+          photoUrl: finalPhotoUrl
         })
       });
 
       if (res.ok) {
-        // 2. Si une nouvelle photo a été sélectionnée depuis le disque, l'enregistrer dans Spring Boot
-        if (editingRoomFile) {
-          try {
-            const photoFormData = new FormData();
-            photoFormData.append("file", editingRoomFile);
-
-            const pRes = await fetch(`${API_BASE}/api/chambres/${editingRoom.id}/photos`, {
-              method: "POST",
-              headers: { "X-User-Id": user.id },
-              body: photoFormData
-            });
-
-            if (!pRes.ok) {
-              const cData = new FormData();
-              cData.append("file", editingRoomFile);
-              cData.append("upload_preset", "pfa_preset");
-
-              const cRes = await fetch("https://api.cloudinary.com/v1_1/mgmnml6e/image/upload", {
-                method: "POST",
-                body: cData
-              });
-
-              if (cRes.ok) {
-                const cJson = await cRes.json();
-                await fetch(`${API_BASE}/api/chambres/${editingRoom.id}/photos/url?url=${encodeURIComponent(cJson.secure_url)}`, {
-                  method: "POST",
-                  headers: { "X-User-Id": user.id }
-                });
-              }
-            }
-          } catch (pErr) {
-            console.error("Erreur lors du téléchargement de la photo modifiée :", pErr);
-          }
-        }
-
-        showToast("✏️ Chambre modifiée avec succès !");
         setEditingRoom(null);
         setEditingRoomFile(null);
         setEditingRoomFilePreview("");
-        if (selectedRiadId) loadChambres(selectedRiadId, user.id);
+        showToast("Chambre modifiée avec succès !");
+        loadChambres(selectedRiadId, user.id);
       } else {
-        showToast("Erreur lors de la modification de la chambre.");
+        alert("Erreur lors de la modification de la chambre.");
       }
-    } catch (e) {
-      showToast("Erreur lors de la modification de la chambre.");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau.");
     }
   };
 
-  // Suppression Chambre
+  const handleToggleRoomDispo = async (chambre) => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/chambres/${chambre.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": user.id
+        },
+        body: JSON.stringify({
+          ...chambre,
+          disponible: !chambre.disponible
+        })
+      });
+
+      if (res.ok) {
+        showToast(`Statut de visibilité mis à jour.`);
+        loadChambres(selectedRiadId, user.id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const confirmDeleteRoom = async () => {
     if (!roomToDelete || !user) return;
     try {
@@ -654,61 +508,84 @@ function ProprietaireDashboardInner() {
         method: "DELETE",
         headers: { "X-User-Id": user.id }
       });
+
       if (res.ok) {
-        showToast("🗑️ Chambre supprimée.");
+        showToast("Chambre supprimée avec succès.");
         setRoomToDelete(null);
-        if (selectedRiadId) loadChambres(selectedRiadId, user.id);
+        loadChambres(selectedRiadId, user.id);
+      } else {
+        alert("Impossible de supprimer cette chambre.");
       }
-    } catch (e) {
-      showToast("Erreur lors de la suppression.");
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  // Mise à jour Profil
+  const handleUpdateReservationStatus = async (id, newStatut) => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/reservations/${id}/statut?statut=${newStatut}`, {
+        method: "PATCH",
+        headers: { "X-User-Id": user.id }
+      });
+      if (res.ok) {
+        showToast(`Réservation ${newStatut === "CONFIRMEE" ? "confirmée" : "refusée"}.`);
+        loadOwnerData(user.id, selectedRiadId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     if (!user) return;
 
     if (profileForm.motDePasse && profileForm.motDePasse !== profileForm.confirmPassword) {
-      showToast("⚠️ Les mots de passe ne correspondent pas.");
+      alert("Les mots de passe ne correspondent pas.");
       return;
     }
 
     try {
+      const body = {
+        nom: profileForm.nom,
+        prenom: profileForm.prenom,
+        telephone: profileForm.telephone
+      };
+      if (profileForm.motDePasse) {
+        body.motDePasse = profileForm.motDePasse;
+      }
+
       const res = await fetch(`${API_BASE}/api/utilisateurs/${user.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "X-User-Id": user.id
         },
-        body: JSON.stringify({
-          nom: profileForm.nom,
-          prenom: profileForm.prenom,
-          telephone: profileForm.telephone,
-          ...(profileForm.motDePasse ? { motDePasse: profileForm.motDePasse } : {})
-        })
+        body: JSON.stringify(body)
       });
 
-      if (res.ok || true) {
-        const updatedUser = {
-          ...user,
-          nom: profileForm.nom,
-          prenom: profileForm.prenom,
-          telephone: profileForm.telephone,
-          ...(ownerPhotoPreview ? { photoUrl: ownerPhotoPreview } : {})
-        };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        showToast("👤 Profil et photo du gérant enregistrés !");
+      if (res.ok) {
+        const updated = await res.json();
+        const merged = { ...user, ...updated };
+        localStorage.setItem("user", JSON.stringify(merged));
+        setUser(merged);
+        showToast("Profil gérant mis à jour avec succès !");
+      } else {
+        alert("Erreur lors de la mise à jour du profil.");
       }
-    } catch (e) {
-      showToast("Erreur lors de la mise à jour du profil.");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau.");
     }
   };
 
-  // Données filtrées
   const filteredRiads = riads;
   const filteredReservations = reservations;
+  const displayedReservations = filteredReservations.filter((r) => {
+    if (reservationFilter === "TOUTES") return true;
+    return r.statut === reservationFilter;
+  });
   const filteredAlertesNouvelles = alertes.nouvellesReservations || [];
   const filteredAlertesArrivees = alertes.arriveesAujourdhui || [];
   const filteredAlertesNettoyage = alertes.nettoyage || [];
@@ -718,14 +595,6 @@ function ProprietaireDashboardInner() {
   const totalCA = filteredReservations
     .filter((r) => r.statut === "CONFIRMEE")
     .reduce((sum, r) => sum + (r.prixTotal || 0), 0);
-
-  if (loading) {
-    return (
-      <div style={{ textAlign: "center", padding: "120px 0", color: "#64748b" }}>
-        <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>Chargement du tableau de bord...</div>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -754,7 +623,6 @@ function ProprietaireDashboardInner() {
       {/* ── VUE 1: TABLEAU DE BORD & ALERTES (tab=dashboard) ────────────────── */}
       {(activeTab === "dashboard" || !activeTab) && (
         <div>
-          {/* Header Épuré sans description */}
           <div style={{ marginBottom: "28px" }}>
             <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0, letterSpacing: "-0.3px" }}>
               Tableau de Bord
@@ -763,36 +631,66 @@ function ProprietaireDashboardInner() {
 
           {/* Executive KPI Bar Cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px", marginBottom: "36px" }}>
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "5px solid var(--terracotta, #d96b43)" }}>
-              <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>🏰 Établissements</div>
+            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid var(--terracotta, #d96b43)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Établissements</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+                  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+                  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+                </svg>
+              </div>
               <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>{filteredRiads.length} <span style={{ fontSize: "0.9rem", color: "#64748b", fontWeight: 600 }}>Riad(s)</span></div>
             </div>
 
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "5px solid #0284c7" }}>
-              <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>🛏️ Capacité Totale</div>
+            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Capacité Totale</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                  <path d="M2 4v16" />
+                  <path d="M2 8h18a2 2 0 0 1 2 2v10" />
+                  <path d="M2 17h20" />
+                </svg>
+              </div>
               <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>{chambres.length} <span style={{ fontSize: "0.9rem", color: "#64748b", fontWeight: 600 }}>Chambres</span></div>
             </div>
 
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "5px solid #10b981" }}>
-              <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>✅ Séjours Confirmés</div>
+            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #10b981" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Séjours Confirmés</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
               <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>{filteredReservations.filter((r) => r.statut === "CONFIRMEE").length}</div>
             </div>
 
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "5px solid #8b5cf6" }}>
-              <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>💰 Chiffre d'Affaires</div>
+            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #8b5cf6" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Chiffre d'Affaires</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                  <rect width="20" height="14" x="2" y="5" rx="2" />
+                  <line x1="2" x2="22" y1="10" y2="10" />
+                </svg>
+              </div>
               <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
                 {totalCA.toLocaleString()} <span style={{ fontSize: "0.9rem", color: "#8b5cf6", fontWeight: 800 }}>MAD</span>
               </div>
             </div>
           </div>
 
-          {/* CENTRE D'ALERTES : 1. DEMANDES EN ATTENTE EN PREMIER */}
+          {/* Centre d'Alertes */}
           <section style={{ marginBottom: "36px" }}>
-            {/* CARTE PRIORITAIRE 1 : Demandes d'approbation en attente */}
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #fee2e2", borderLeft: "6px solid #ef4444", marginBottom: "24px" }}>
+            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #fee2e2", borderLeft: "5px solid #ef4444", marginBottom: "24px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "8px" }}>
-                  🚨 Demandes de Réservation en Attente
+                <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" x2="12" y1="8" y2="12" />
+                    <line x1="12" x2="12.01" y1="16" y2="16" />
+                  </svg>
+                  Demandes de Réservation en Attente
                 </div>
                 <span style={{ backgroundColor: "#fee2e2", color: "#991b1b", fontSize: "0.8rem", fontWeight: 800, padding: "6px 14px", borderRadius: "20px" }}>
                   {filteredAlertesNouvelles.length} demande(s) à décider
@@ -822,12 +720,15 @@ function ProprietaireDashboardInner() {
               )}
             </div>
 
-            {/* SECONDAIRE : Check-in du Jour & Nettoyage */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
-              {/* Carte 2: Arrivées du Jour (Check-in) */}
               <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.98rem" }}>🧳 Arrivées du Jour (Check-in)</div>
+                  <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.98rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 20h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
+                    </svg>
+                    Arrivées du Jour (Check-in)
+                  </div>
                   <span style={{ backgroundColor: "#e0f2fe", color: "#0369a1", fontSize: "0.75rem", fontWeight: 800, padding: "4px 12px", borderRadius: "16px" }}>
                     {filteredAlertesArrivees.length} client(s)
                   </span>
@@ -845,10 +746,14 @@ function ProprietaireDashboardInner() {
                 )}
               </div>
 
-              {/* Carte 3: Nettoyage */}
               <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.98rem" }}>🧹 Nettoyage & Préparation</div>
+                  <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.98rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                    </svg>
+                    Nettoyage & Préparation
+                  </div>
                   <span style={{ backgroundColor: "#fef3c7", color: "#b45309", fontSize: "0.75rem", fontWeight: 800, padding: "4px 12px", borderRadius: "16px" }}>
                     {filteredAlertesNettoyage.length} tâche(s)
                   </span>
@@ -873,85 +778,123 @@ function ProprietaireDashboardInner() {
               </div>
             </div>
           </section>
-        </div>
-      )}
+          {/* ── SUIVI DES RÉSERVATIONS (Intégré dans le Tableau de Bord Opérationnel) ── */}
+          <section style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "16px" }}>
+              <div>
+                <h2 style={{ fontSize: "1.25rem", color: "#0f172a", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
+                    <path d="M12 11h4" />
+                    <path d="M12 16h4" />
+                    <path d="M8 11h.01" />
+                    <path d="M8 16h.01" />
+                  </svg>
+                  Suivi des Réservations
+                </h2>
+                <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
+                  Consultez, filtrez et traitez les réservations de votre établissement en temps réel.
+                </p>
+              </div>
 
-      {/* ── NOUVELLE VUE: HISTORIQUE DES RÉSERVATIONS (tab=historique) ─────────── */}
-      {activeTab === "historique" && (
-        <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
-            <div>
-              <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                📜 Historique Complet des Réservations
-              </h2>
-              <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
-                Consultez et gérez l'ensemble des demandes et séjours confirmés de vos clients.
-              </p>
+              {/* Filtres par statut */}
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {[
+                  { label: "Toutes", value: "TOUTES", count: filteredReservations.length },
+                  { label: "En Attente", value: "EN_ATTENTE", count: filteredReservations.filter((r) => r.statut === "EN_ATTENTE").length },
+                  { label: "Confirmées", value: "CONFIRMEE", count: filteredReservations.filter((r) => r.statut === "CONFIRMEE").length },
+                  { label: "Refusées", value: "REFUSEE", count: filteredReservations.filter((r) => r.statut === "REFUSEE").length }
+                ].map((f) => {
+                  const isActive = reservationFilter === f.value;
+                  return (
+                    <button
+                      key={f.value}
+                      onClick={() => setReservationFilter(f.value)}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "10px",
+                        fontSize: "0.8rem",
+                        fontWeight: isActive ? 800 : 600,
+                        border: isActive ? "1px solid var(--terracotta, #d96b43)" : "1px solid #cbd5e1",
+                        backgroundColor: isActive ? "rgba(217, 107, 67, 0.12)" : "#f8fafc",
+                        color: isActive ? "var(--terracotta, #d96b43)" : "#475569",
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {f.label} ({f.count})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <span style={{ backgroundColor: "#f1f5f9", padding: "8px 16px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>
-                Total : {filteredReservations.length} réservation(s)
-              </span>
-            </div>
-          </div>
 
-          {filteredReservations.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: "#64748b" }}>
-              <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>📋</div>
-              <p style={{ margin: 0, fontWeight: 700 }}>Aucune réservation enregistrée pour cet établissement.</p>
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
-                <thead>
-                  <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
-                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>ID Réservation</th>
-                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Date Début</th>
-                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Date Fin</th>
-                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Montant Total</th>
-                    <th style={{ padding: "14px 12px", fontWeight: 800 }}>Statut</th>
-                    <th style={{ padding: "14px 12px", fontWeight: 800, textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredReservations.map((r) => (
-                    <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                      <td style={{ padding: "14px 12px", fontWeight: 700, color: "#0f172a" }}>#{r.id.substring(0, 8)}</td>
-                      <td style={{ padding: "14px 12px", color: "#475569" }}>{r.dateDebut}</td>
-                      <td style={{ padding: "14px 12px", color: "#475569" }}>{r.dateFin}</td>
-                      <td style={{ padding: "14px 12px", fontWeight: 800, color: "#0f172a" }}>{r.prixTotal} MAD</td>
-                      <td style={{ padding: "14px 12px" }}>
-                        <span
-                          style={{
-                            backgroundColor: r.statut === "CONFIRMEE" ? "#dcfce7" : r.statut === "REFUSEE" ? "#fee2e2" : "#fef3c7",
-                            color: r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309",
-                            padding: "4px 12px",
-                            borderRadius: "14px",
-                            fontSize: "0.75rem",
-                            fontWeight: 800
-                          }}
-                        >
-                          {r.statut}
-                        </span>
-                      </td>
-                      <td style={{ padding: "14px 12px", textAlign: "right" }}>
-                        {r.statut === "EN_ATTENTE" && (
-                          <div style={{ display: "inline-flex", gap: "6px" }}>
-                            <button onClick={() => handleUpdateReservationStatus(r.id, "CONFIRMEE")} style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer" }}>
-                              Accepter
-                            </button>
-                            <button onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")} style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer" }}>
-                              Refuser
-                            </button>
-                          </div>
-                        )}
-                      </td>
+            {displayedReservations.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "36px 20px", color: "#64748b" }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: "0.9rem" }}>Aucune réservation trouvée pour ce filtre.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>ID Réservation</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Date Début</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Date Fin</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Montant Total</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Statut</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800, textAlign: "right" }}>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {displayedReservations.map((r) => (
+                      <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                        <td style={{ padding: "14px 10px", fontWeight: 700, color: "#0f172a" }}>#{r.id.substring(0, 8)}</td>
+                        <td style={{ padding: "14px 10px", color: "#475569" }}>{r.dateDebut}</td>
+                        <td style={{ padding: "14px 10px", color: "#475569" }}>{r.dateFin}</td>
+                        <td style={{ padding: "14px 10px", fontWeight: 800, color: "#0f172a" }}>{r.prixTotal} MAD</td>
+                        <td style={{ padding: "14px 10px" }}>
+                          <span
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: "20px",
+                              fontSize: "0.75rem",
+                              fontWeight: 800,
+                              backgroundColor:
+                                r.statut === "CONFIRMEE" ? "#dcfce7" : r.statut === "REFUSEE" ? "#fee2e2" : "#fef3c7",
+                              color:
+                                r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309"
+                            }}
+                          >
+                            {r.statut}
+                          </span>
+                        </td>
+                        <td style={{ padding: "14px 10px", textAlign: "right" }}>
+                          {r.statut === "EN_ATTENTE" && (
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                              <button
+                                onClick={() => handleUpdateReservationStatus(r.id, "CONFIRMEE")}
+                                style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
+                              >
+                                Accepter
+                              </button>
+                              <button
+                                onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")}
+                                style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
+                              >
+                                Refuser
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
@@ -982,7 +925,6 @@ function ProprietaireDashboardInner() {
             </button>
           </div>
 
-          {/* Grille de cartes de chambres Haute Qualité */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "24px" }}>
             {chambres.map((ch) => (
               <div
@@ -1017,20 +959,19 @@ function ProprietaireDashboardInner() {
                         fontWeight: 800,
                         padding: "5px 12px",
                         borderRadius: "20px",
-                        border: ch.disponible ? "1px solid #bbf7d0" : "1px solid #fecdd3"
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
                       }}
                     >
-                      {ch.disponible ? "🟢 Disponible" : "🔴 Masquée"}
+                      {ch.disponible ? "Disponible" : "Masquée"}
                     </span>
                   </div>
 
-                  <div style={{ padding: "20px" }}>
-                    <h4 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0" }}>
+                  <div style={{ padding: "18px 20px 10px 20px" }}>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0" }}>
                       {ch.nomChambre}
-                    </h4>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-                      <span style={{ backgroundColor: "#f1f5f9", color: "#475569", fontSize: "0.75rem", fontWeight: 700, padding: "3px 10px", borderRadius: "12px" }}>
+                    </h3>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "14px" }}>
+                      <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>
                         {ch.typeChambre}
                       </span>
                       <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>•</span>
@@ -1071,19 +1012,18 @@ function ProprietaireDashboardInner() {
                     >
                       ✏️ Modifier
                     </button>
-
                     <button
-                      onClick={() => handleToggleDisponibilite(ch.id, ch.disponible)}
+                      onClick={() => handleToggleRoomDispo(ch)}
                       style={{
                         flex: 1,
-                        border: "1px solid #cbd5e1",
-                        background: "#f8fafc",
+                        backgroundColor: ch.disponible ? "#fff1f2" : "#f0fdf4",
+                        color: ch.disponible ? "#e11d48" : "#16a34a",
+                        border: ch.disponible ? "1px solid #fecdd3" : "1px solid #bbf7d0",
                         padding: "10px",
                         borderRadius: "10px",
                         fontSize: "0.82rem",
                         fontWeight: 700,
-                        cursor: "pointer",
-                        color: "#0f172a"
+                        cursor: "pointer"
                       }}
                     >
                       {ch.disponible ? "🔴 Masquer" : "🟢 Publier"}
@@ -1120,201 +1060,69 @@ function ProprietaireDashboardInner() {
       {/* ── VUE 4: MODIFIER RIAD & SERVICES (tab=riad) ───────────────────────── */}
       {(activeTab === "riad" || activeTab === "nouveau-riad") && selectedRiad && (
         <div style={{ maxWidth: "980px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "24px" }}>
-          
-          {/* BARRE DE SÉLECTION & AJOUT DU RIAD (UNIQUEMENT DANS FICHE RIAD) */}
           <div
             style={{
               backgroundColor: "#ffffff",
               padding: "20px 24px",
               borderRadius: "16px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
               border: "1px solid #e2e8f0",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              gap: "16px",
-              flexWrap: "wrap"
+              flexWrap: "wrap",
+              gap: "16px"
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", flex: 1 }}>
-              <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap" }}>
-                📍 Vos Riads ({riads.length}) :
-              </span>
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                {riads.map((r) => (
+            <div>
+              <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--terracotta)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                Gestion de vos Riads
+              </div>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                {services.nom || "Fiche du Riad"}
+              </h3>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              {filteredRiads.map((r) => {
+                const isSelected = r.id === selectedRiadId;
+                return (
                   <button
                     key={r.id}
-                    type="button"
-                    onClick={() => {
-                      handleRiadChange(r.id);
-                      setActiveTab("riad");
-                    }}
+                    onClick={() => handleSelectRiad(r)}
                     style={{
-                      padding: "9px 20px",
-                      borderRadius: "12px",
-                      border: (selectedRiadId === r.id && activeTab === "riad") ? "2px solid var(--terracotta, #d96b43)" : "1px solid #cbd5e1",
-                      backgroundColor: (selectedRiadId === r.id && activeTab === "riad") ? "#fff7ed" : "#f8fafc",
-                      color: (selectedRiadId === r.id && activeTab === "riad") ? "var(--terracotta, #d96b43)" : "#475569",
-                      fontWeight: 800,
-                      fontSize: "0.88rem",
-                      cursor: "pointer",
-                      display: "inline-flex",
+                      display: "flex",
                       alignItems: "center",
-                      gap: "10px",
-                      boxShadow: (selectedRiadId === r.id && activeTab === "riad") ? "0 4px 12px rgba(217, 107, 67, 0.2)" : "none",
-                      transition: "all 0.2s ease"
+                      gap: "8px",
+                      padding: "8px 16px",
+                      borderRadius: "10px",
+                      border: isSelected ? "2px solid var(--terracotta)" : "1px solid #cbd5e1",
+                      backgroundColor: isSelected ? "rgba(217, 107, 67, 0.1)" : "#f8fafc",
+                      color: isSelected ? "var(--terracotta)" : "#475569",
+                      fontWeight: isSelected ? 800 : 600,
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      transition: "all 0.2s"
                     }}
                   >
-                    <img
-                      src={r.photoUrl}
-                      alt={r.nom}
-                      style={{ width: "26px", height: "26px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(0,0,0,0.1)" }}
-                    />
-                    🏰 {r.nom}
+                    <span>🏰</span>
+                    {r.nom}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab(activeTab === "nouveau-riad" ? "riad" : "nouveau-riad")}
-              style={{
-                backgroundColor: activeTab === "nouveau-riad" ? "#64748b" : "var(--terracotta, #d96b43)",
-                color: "#ffffff",
-                border: "none",
-                padding: "11px 22px",
-                borderRadius: "12px",
-                fontWeight: 800,
-                fontSize: "0.88rem",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                boxShadow: "0 4px 14px rgba(217, 107, 67, 0.25)",
-                whiteSpace: "nowrap"
-              }}
-            >
-              {activeTab === "nouveau-riad" ? "↩️ Retour à la Fiche" : "➕ Ajouter un Riad"}
-            </button>
           </div>
 
-          {/* FORMULAIRE NOUVEAU RIAD AVEC SERVICES PROPOSÉS */}
-          {activeTab === "nouveau-riad" && (
-            <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-                <div>
-                  <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                    ➕ Créer un Nouveau Riad ({ownerCity})
-                  </h2>
-                  <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
-                    Remplissez les informations et activez les services proposés aux voyageurs.
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleCreateRiad}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-                  <div>
-                    {/* 1. Nom & Ville */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-                      <div>
-                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Nom du Riad *</label>
-                        <input type="text" required placeholder="ex: Riad Al Qods" value={newRiadForm.nom} onChange={(e) => setNewRiadForm({ ...newRiadForm, nom: e.target.value })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }} />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Ville</label>
-                        <input type="text" disabled value={ownerCity} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", color: "#64748b", fontWeight: 700, fontSize: "0.9rem" }} />
-                      </div>
-                    </div>
-
-                    {/* 2. Adresse */}
-                    <div style={{ marginBottom: "16px" }}>
-                      <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Adresse complète dans la Médina *</label>
-                      <input type="text" required placeholder="ex: Derb Sidi Ahmed Soussi, Médina" value={newRiadForm.adresse} onChange={(e) => setNewRiadForm({ ...newRiadForm, adresse: e.target.value })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }} />
-                    </div>
-
-                    {/* 3. Description */}
-                    <div style={{ marginBottom: "16px" }}>
-                      <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Description commerciale *</label>
-                      <textarea rows={4} required placeholder="Description élégante de votre Riad pour les voyageurs..." value={newRiadForm.description} onChange={(e) => setNewRiadForm({ ...newRiadForm, description: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.88rem", fontFamily: "inherit" }} />
-                    </div>
-
-                    {/* 4. Tarif Privatisation & Photo */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                      <div>
-                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Privatisation / nuit (MAD) *</label>
-                        <input type="number" required value={newRiadForm.prixRiadEntier} onChange={(e) => setNewRiadForm({ ...newRiadForm, prixRiadEntier: parseFloat(e.target.value) || 0 })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.95rem" }} />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Photo principale (depuis PC)</label>
-                        <input type="file" accept="image/*" onChange={(e) => { if (e.target.files && e.target.files[0]) { setSelectedRiadFile(e.target.files[0]); setRiadFilePreview(URL.createObjectURL(e.target.files[0])); } }} style={{ width: "100%", fontSize: "0.82rem" }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 5. SERVICES PROPOSÉS AUX VOYAGEURS (DANS LE FORMULAIRE NOUVEAU RIAD) */}
-                  <div style={{ backgroundColor: "#f8fafc", padding: "24px", borderRadius: "14px", border: "1px solid #e2e8f0", height: "fit-content" }}>
-                    <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>
-                      ✨ Services Proposés aux Voyageurs
-                    </h4>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e2e8f0" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Service Spa & Massage</div>
-                        <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Espace bien-être et soins de relaxation</div>
-                      </div>
-                      <input type="checkbox" checked={newRiadForm.hasSpa} onChange={(e) => setNewRiadForm({ ...newRiadForm, hasSpa: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta, #d96b43)" }} />
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e2e8f0" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Hammam Traditionnel Marocain</div>
-                        <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Bain de vapeur et gommage traditionnel</div>
-                      </div>
-                      <input type="checkbox" checked={newRiadForm.hasHammam} onChange={(e) => setNewRiadForm({ ...newRiadForm, hasHammam: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta, #d96b43)" }} />
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Table d'Hôte & Service Traiteur</div>
-                        <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Petits-déjeuners et dîners gastronomiques</div>
-                      </div>
-                      <input type="checkbox" checked={newRiadForm.hasTraiteur} onChange={(e) => setNewRiadForm({ ...newRiadForm, hasTraiteur: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta, #d96b43)" }} />
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-                  <button type="button" onClick={() => setActiveTab("riad")} style={{ padding: "12px 22px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>
-                    Annuler
-                  </button>
-                  <button type="submit" style={{ backgroundColor: "var(--terracotta, #d96b43)", color: "#ffffff", border: "none", padding: "12px 28px", borderRadius: "10px", fontWeight: 800, fontSize: "0.95rem", cursor: "pointer", boxShadow: "0 4px 15px rgba(217, 107, 67, 0.3)" }}>
-                    🏰 Créer et Enregistrer le Riad
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* FICHE RIAD & PRESTATIONS ACTUELLE */}
-          {activeTab === "riad" && (
-            <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
-                <div>
-                  <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                    Fiche Riad & Prestations : {services.nom}
-                  </h2>
-                </div>
-                <button onClick={handleSaveServices} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "12px 24px", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(217, 107, 67, 0.25)" }}>
-                  Enregistrer Les Modifications
-                </button>
-              </div>
-
           <form onSubmit={handleSaveServices}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-              <div>
-                {/* 1. Nom du Riad */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
+              <div style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                  <h4 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>Fiche Riad</h4>
+                  <button type="submit" disabled={isSavingRiad} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "8px 18px", borderRadius: "8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
+                    {isSavingRiad ? "Enregistrement..." : "💾 Enregistrer"}
+                  </button>
+                </div>
+
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Nom du Riad *</label>
                   <input
@@ -1326,7 +1134,6 @@ function ProprietaireDashboardInner() {
                   />
                 </div>
 
-                {/* 2. Adresse */}
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Adresse dans la Médina *</label>
                   <input
@@ -1338,7 +1145,6 @@ function ProprietaireDashboardInner() {
                   />
                 </div>
 
-                {/* 3. Modification Photo du Riad depuis le disque */}
                 <div style={{ marginBottom: "18px" }}>
                   <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>
                     Changer la photo du Riad (depuis votre disque local)
@@ -1363,27 +1169,21 @@ function ProprietaireDashboardInner() {
                         }}
                         style={{ width: "100%", fontSize: "0.8rem" }}
                       />
-                      <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px" }}>
-                        {editRiadFile ? `Fichier sélectionné : ${editRiadFile.name}` : "Sélectionner une nouvelle photo pour le Riad"}
-                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 4. Description commerciale */}
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Description commerciale *</label>
                   <textarea rows={5} value={services.description} onChange={(e) => setServices({ ...services, description: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.88rem", fontFamily: "inherit" }} />
                 </div>
 
-                {/* 5. Tarif Privatisation */}
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Tarif Privatisation Riad Entier (MAD / nuit)</label>
                   <input type="number" value={services.prixRiadEntier} onChange={(e) => setServices({ ...services, prixRiadEntier: parseFloat(e.target.value) || 0 })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.95rem" }} />
                 </div>
               </div>
 
-              {/* 6. Services Proposés */}
               <div style={{ backgroundColor: "#f8fafc", padding: "24px", borderRadius: "14px", border: "1px solid #e2e8f0", height: "fit-content" }}>
                 <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0" }}>Services Proposés aux Voyageurs</h4>
 
@@ -1498,7 +1298,7 @@ function ProprietaireDashboardInner() {
               </div>
             </div>
 
-            <div style={{ textAlign: "center" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
               <button
                 type="submit"
                 style={{
@@ -1516,11 +1316,33 @@ function ProprietaireDashboardInner() {
               >
                 💾 Enregistrer les Modifications
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem("user");
+                  localStorage.removeItem("token");
+                  window.location.href = "/login";
+                }}
+                style={{
+                  backgroundColor: "#fff1f2",
+                  color: "#e11d48",
+                  border: "1px solid #fecdd3",
+                  padding: "14px 28px",
+                  borderRadius: "12px",
+                  fontWeight: 800,
+                  fontSize: "0.95rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                🔒 Déconnexion Sécurisée
+              </button>
             </div>
           </form>
-        </div>
-      )}
-
         </div>
       )}
 
@@ -1608,7 +1430,6 @@ function ProprietaireDashboardInner() {
                 </div>
               </div>
 
-              {/* SELECTION PHOTO DISQUE POUR MODIFICATION CHAMBRE */}
               <div style={{ marginBottom: "18px" }}>
                 <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
                   Changer la photo de la chambre (depuis votre disque local)
@@ -1633,9 +1454,6 @@ function ProprietaireDashboardInner() {
                       }}
                       style={{ width: "100%", fontSize: "0.8rem" }}
                     />
-                    <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px" }}>
-                      {editingRoomFile ? `Fichier sélectionné : ${editingRoomFile.name}` : "Sélectionner une nouvelle photo sur votre PC"}
-                    </div>
                   </div>
                 </div>
               </div>

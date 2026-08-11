@@ -19,7 +19,7 @@ export default function ProprietaireIndex() {
         // En cas d'erreur de parse
       }
     }
-    router.push("/proprietaire/login");
+    router.push("/login");
   }, [router]);
 
   return null;

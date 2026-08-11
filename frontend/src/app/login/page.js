@@ -69,16 +69,14 @@ export default function Login() {
 
       // Redirection intelligente selon le rôle de l'utilisateur
       setTimeout(() => {
-        if (data.role === "CLIENT") {
-          router.push("/client");
-        } else if (data.role === "PROPRIETAIRE") {
-          router.push("/proprietaire");
+        if (data.role === "PROPRIETAIRE") {
+          router.push("/proprietaire/dashboard");
         } else if (data.role === "ADMIN") {
-          router.push("/admin");
+          router.push("/proprietaire/dashboard");
         } else {
-          router.push("/");
+          router.push("/client/catalogue");
         }
-      }, 1500);
+      }, 1000);
 
     } catch (err) {
       setError(err.message || (language === "en" ? "An error occurred during login." : "Une erreur est survenue lors de la connexion."));

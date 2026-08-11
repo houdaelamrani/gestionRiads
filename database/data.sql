@@ -7,7 +7,7 @@ TRUNCATE TABLE avis, paiements, reservation_chambres, reservations, photos, cham
 -- 1. Insertion des Utilisateurs (Administrateur, Propriétaires par Ville, Clients)
 INSERT INTO utilisateurs (id, nom, prenom, email, mot_de_passe, telephone, role, statut) VALUES
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'El Amrani', 'houda', 'admin@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000001', 'ADMIN', 'ACTIF'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Alaoui', 'Mustapha', 'proprietaire@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000002', 'PROPRIETAIRE', 'ACTIF'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'El Amrani', 'Houda', 'proprietaire@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000002', 'PROPRIETAIRE', 'ACTIF'),
 ('76dedb51-3964-45a0-9e55-eddbf0fbed78', 'Elamrani', 'Houda', 'elamranihouda540@gmail.com', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000000', 'PROPRIETAIRE', 'ACTIF'),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Tazi', 'Khadija', 'owner2@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000003', 'PROPRIETAIRE', 'ACTIF'),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99', 'Idrissi', 'Youssef', 'owner.fes@riad.ma', '$2a$10$I6iTCGAezaNx600NvLLA8.uaMkLPHvKcl02Qlaxi0TiUdHuHolL9C', '+212600000004', 'PROPRIETAIRE', 'ACTIF'),
@@ -16,7 +16,7 @@ INSERT INTO utilisateurs (id, nom, prenom, email, mot_de_passe, telephone, role,
 
 -- 2. Insertion des Riads (Séparés strictement par Propriétaire et par Ville)
 INSERT INTO riads (id, nom, description, adresse, ville, proprietaire_id, statut_validation, prix_riad_entier, has_spa, has_traiteur, has_hammam) VALUES
--- Riads de Marrakech (Propriétaire Mustapha Alaoui - proprietaire@riad.ma)
+-- Riads de Marrakech (Propriétaire Houda El Amrani - proprietaire@riad.ma)
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a66', 'Riad Dar El Bacha', 'Un havre de paix au coeur de la médina de Marrakech avec piscine et toit terrasse.', '12 Rue Dar El Bacha, Médina', 'Marrakech', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'VALIDE', 2500.00, TRUE, TRUE, TRUE),
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99', 'Riad Cinnamon', 'Riad de charme raffiné, ancienne demeure de marchand d épices entièrement rénovée.', 'Derb el Kadi, Marrakech', 'Marrakech', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'VALIDE', 3000.00, TRUE, TRUE, FALSE),
 

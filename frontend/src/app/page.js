@@ -114,6 +114,7 @@ export default function Home() {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     setCurrentUser(null);
+    window.location.href = "/login";
   };
 
   const renderStars = (note) => {
@@ -306,19 +307,20 @@ export default function Home() {
               </span>
               {currentUser.role === "CLIENT" && (
                 <Link
-                  href="/client"
+                  href="/client/catalogue"
                   className="btn btn-secondary"
                   style={{
                     padding: "8px 16px",
                     fontSize: "0.85rem",
-                    border: "1px solid #3b82f6",
-                    color: "#3b82f6",
+                    border: "1px solid var(--terracotta)",
+                    color: "var(--terracotta)",
+                    fontWeight: 700
                   }}
                 >
-                  {t("espace_client")}
+                  🏡 Mon Espace Client
                 </Link>
               )}
-              {(currentUser.role === "PROPRIETAIRE" || currentUser.role === "ADMIN") && (
+              {currentUser.role === "PROPRIETAIRE" && (
                 <Link
                   href="/proprietaire/dashboard"
                   className="btn btn-secondary"
@@ -330,7 +332,22 @@ export default function Home() {
                     fontWeight: 700
                   }}
                 >
-                  📊 Tableau de Bord Propriétaire
+                  🏰 Mon Espace Gérant
+                </Link>
+              )}
+              {currentUser.role === "ADMIN" && (
+                <Link
+                  href="/proprietaire/dashboard"
+                  className="btn btn-secondary"
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "0.85rem",
+                    border: "1px solid #6366f1",
+                    color: "#6366f1",
+                    fontWeight: 700
+                  }}
+                >
+                  👨‍💼 Espace Administrateur
                 </Link>
               )}
               <button
@@ -349,31 +366,16 @@ export default function Home() {
           ) : (
             <>
               <Link
-                href="/proprietaire"
-                style={{
-                  padding: "8px 14px",
-                  fontSize: "0.82rem",
-                  color: "var(--terracotta)",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px"
-                }}
-              >
-                🏛️ Espace Propriétaire
-              </Link>
-              <Link
                 href="/login"
                 className="btn btn-secondary"
-                style={{ padding: "8px 16px", fontSize: "0.85rem" }}
+                style={{ padding: "8px 18px", fontSize: "0.85rem", fontWeight: 700 }}
               >
                 {t("login")}
               </Link>
               <Link
                 href="/register"
                 className="btn btn-primary"
-                style={{ padding: "8px 20px", fontSize: "0.85rem" }}
+                style={{ padding: "8px 20px", fontSize: "0.85rem", fontWeight: 700 }}
               >
                 {t("register")}
               </Link>
@@ -606,7 +608,7 @@ export default function Home() {
                       )
                     : riad.prixRiadEntier;
 
-                const detailsUrl = currentUser?.role === "CLIENT" ? `/client/riads/${riad.id}` : "/login";
+                const detailsUrl = currentUser ? `/client/riads/${riad.id}` : "/login";
 
                 return (
                   <Link href={detailsUrl} key={riad.id} style={{ textDecoration: "none", color: "inherit" }}>
