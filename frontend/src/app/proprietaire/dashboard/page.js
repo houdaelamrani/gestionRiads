@@ -23,6 +23,22 @@ function ProprietaireDashboardInner() {
   const [selectedCityFilter, setSelectedCityFilter] = useState("Toutes");
   const [reservationFilter, setReservationFilter] = useState("TOUTES");
 
+  // Modale Réservation Directe (Walk-in / Téléphone)
+  const [showDirectBookingModal, setShowDirectBookingModal] = useState(false);
+  const [isSubmittingDirectBooking, setIsSubmittingDirectBooking] = useState(false);
+  const [directBookingForm, setDirectBookingForm] = useState({
+    riadId: "",
+    chambreId: "",
+    riadEntier: false,
+    nom: "",
+    prenom: "",
+    email: "",
+    telephone: "",
+    dateDebut: new Date().toISOString().split("T")[0],
+    dateFin: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+    methodePaiement: "SUR_PLACE"
+  });
+
   // Modale de Check-in Client à l'arrivée
   const [checkInReservation, setCheckInReservation] = useState(null);
   const [isSubmittingCheckIn, setIsSubmittingCheckIn] = useState(false);
@@ -698,6 +714,48 @@ function ProprietaireDashboardInner() {
     }
   };
 
+  const handleSubmitDirectBooking = async (e) => {
+    e.preventDefault();
+    if (!directBookingForm.riadId) {
+      alert("Veuillez sélectionner un établissement (Riad).");
+      return;
+    }
+    setIsSubmittingDirectBooking(true);
+    try {
+      const payload = {
+        riadId: directBookingForm.riadId,
+        dateDebut: directBookingForm.dateDebut,
+        dateFin: directBookingForm.dateFin,
+        riadEntier: directBookingForm.riadEntier,
+        chambreIds: directBookingForm.riadEntier ? [] : (directBookingForm.chambreId ? [directBookingForm.chambreId] : []),
+        nom: directBookingForm.nom || "Client",
+        prenom: directBookingForm.prenom || "Direct",
+        email: directBookingForm.email || `client.direct.${Date.now()}@riad.ma`,
+        telephone: directBookingForm.telephone || "+212 600-000000",
+        methodePaiement: directBookingForm.methodePaiement
+      };
+
+      const res = await fetch(`${API_BASE}/api/reservations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Erreur lors de la réservation directe.");
+      }
+
+      showToast("✓ Réservation directe enregistrée avec succès !");
+      setShowDirectBookingModal(false);
+      if (user?.id) loadOwnerData(user.id);
+    } catch (err) {
+      alert(err.message || "Erreur lors de la réservation.");
+    } finally {
+      setIsSubmittingDirectBooking(false);
+    }
+  };
+
   const filteredRiads = riads;
   const filteredReservations = reservations;
   const displayedReservations = filteredReservations.filter((r) => {
@@ -712,6 +770,10 @@ function ProprietaireDashboardInner() {
   const totalCA = filteredReservations
     .filter((r) => r.statut === "CONFIRMEE")
     .reduce((sum, r) => sum + (r.prixTotal || 0), 0);
+
+  const confirmedReservationsCount = filteredReservations.filter((r) => r.statut === "CONFIRMEE").length;
+  const totalChambresCount = chambres.length > 0 ? chambres.length : (riads.length * 3 || 1);
+  const tauxOccupation = Math.min(100, Math.max(0, Math.round((confirmedReservationsCount / Math.max(1, totalChambresCount)) * 100)));
 
   return (
     <div>
@@ -740,83 +802,184 @@ function ProprietaireDashboardInner() {
       {/* ── VUE 1: TABLEAU DE BORD & ALERTES (tab=dashboard) ────────────────── */}
       {(activeTab === "dashboard" || !activeTab) && (
         <div>
-          <div style={{ marginBottom: "28px" }}>
-            <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0, letterSpacing: "-0.3px" }}>
-              Tableau de Bord
-            </h1>
+          {/* Header & Quick Actions Bar */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0, letterSpacing: "-0.3px" }}>
+                Tableau de Bord
+              </h1>
+              <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
+                Vue d'ensemble opérationnelle et indicateurs de performance de vos Riads.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectBookingForm({
+                    riadId: selectedRiad?.id || (riads[0]?.id || ""),
+                    chambreId: chambres[0]?.id || "",
+                    riadEntier: false,
+                    nom: "",
+                    prenom: "",
+                    email: "",
+                    telephone: "",
+                    dateDebut: new Date().toISOString().split("T")[0],
+                    dateFin: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+                    methodePaiement: "SUR_PLACE"
+                  });
+                  setShowDirectBookingModal(true);
+                }}
+                style={{
+                  backgroundColor: "var(--terracotta, #d96b43)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "10px",
+                  padding: "10px 18px",
+                  fontSize: "0.85rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 14px rgba(217, 107, 67, 0.35)",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                <span>➕</span> Réservation Directe
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                style={{
+                  backgroundColor: "#ffffff",
+                  color: "#0f172a",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "10px",
+                  padding: "10px 16px",
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                }}
+              >
+                <span>📥</span> Exporter Rapport (PDF)
+              </button>
+            </div>
           </div>
 
-          {/* Executive KPI Bar Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px", marginBottom: "36px" }}>
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid var(--terracotta, #d96b43)" }}>
+          {/* 5 Balanced Executive KPI Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "18px", marginBottom: "32px" }}>
+            {/* 1. Établissements */}
+            <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid var(--terracotta, #d96b43)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Établissements</div>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Établissements</div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
                   <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
                   <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
                 </svg>
               </div>
-              <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>{filteredRiads.length} <span style={{ fontSize: "0.9rem", color: "#64748b", fontWeight: 600 }}>Riad(s)</span></div>
+              <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
+                {filteredRiads.length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Riad(s)</span>
+              </div>
             </div>
 
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
+            {/* 2. Capacité */}
+            <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Capacité Totale</div>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Capacité Totale</div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 4v16" />
                   <path d="M2 8h18a2 2 0 0 1 2 2v10" />
                   <path d="M2 17h20" />
                 </svg>
               </div>
-              <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>{chambres.length} <span style={{ fontSize: "0.9rem", color: "#64748b", fontWeight: 600 }}>Chambres</span></div>
+              <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
+                {chambres.length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Chambres</span>
+              </div>
             </div>
 
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #10b981" }}>
+            {/* 3. Taux d'Occupation */}
+            <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #10b981" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Séjours Confirmés</div>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Taux d'Occupation</div>
+                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#10b981", backgroundColor: "#dcfce7", padding: "2px 8px", borderRadius: "10px" }}>Actif</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: "8px" }}>
+                <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a" }}>
+                  {tauxOccupation}%
+                </div>
+                <div style={{ width: "45px", height: "6px", backgroundColor: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
+                  <div style={{ width: `${tauxOccupation}%`, height: "100%", backgroundColor: "#10b981" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Séjours Confirmés */}
+            <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #06b6d4" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Séjours Confirmés</div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
               </div>
-              <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>{filteredReservations.filter((r) => r.statut === "CONFIRMEE").length}</div>
+              <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
+                {filteredReservations.filter((r) => r.statut === "CONFIRMEE").length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Séjour(s)</span>
+              </div>
             </div>
 
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #8b5cf6" }}>
+            {/* 5. Chiffre d'Affaires */}
+            <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #8b5cf6" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Chiffre d'Affaires</div>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Chiffre d'Affaires</div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect width="20" height="14" x="2" y="5" rx="2" />
                   <line x1="2" x2="22" y1="10" y2="10" />
                 </svg>
               </div>
-              <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
-                {totalCA.toLocaleString()} <span style={{ fontSize: "0.9rem", color: "#8b5cf6", fontWeight: 800 }}>MAD</span>
+              <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
+                {totalCA.toLocaleString()} <span style={{ fontSize: "0.85rem", color: "#8b5cf6", fontWeight: 800 }}>MAD</span>
               </div>
             </div>
           </div>
 
-          {/* Centre d'Alertes */}
-          <section style={{ marginBottom: "36px" }}>
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #fee2e2", borderLeft: "5px solid #ef4444", marginBottom: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" x2="12" y1="8" y2="12" />
-                    <line x1="12" x2="12.01" y1="16" y2="16" />
-                  </svg>
-                  Demandes de Réservation en Attente
+          {/* Centre d'Alertes & Décisions */}
+          <section style={{ marginBottom: "32px" }}>
+            {filteredAlertesNouvelles.length === 0 ? (
+              /* Encart discret lorsque 0 demande en attente */
+              <div style={{ backgroundColor: "#ffffff", padding: "14px 20px", borderRadius: "14px", border: "1px solid #e2e8f0", borderLeft: "4px solid #10b981", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.86rem", color: "#334155", fontWeight: 700 }}>
+                  <span style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: "#dcfce7", color: "#16a34a", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 900 }}>✓</span>
+                  Toutes les demandes de réservation sont traitées (0 en attente de décision).
                 </div>
-                <span style={{ backgroundColor: "#fee2e2", color: "#991b1b", fontSize: "0.8rem", fontWeight: 800, padding: "6px 14px", borderRadius: "20px" }}>
-                  {filteredAlertesNouvelles.length} demande(s) à décider
+                <span style={{ fontSize: "0.75rem", color: "#15803d", backgroundColor: "#f0fdf4", fontWeight: 800, padding: "4px 10px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                  À JOUR
                 </span>
               </div>
+            ) : (
+              /* Encart d'alerte prioritaire lorsqu'il y a des demandes à décider */
+              <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #fee2e2", borderLeft: "5px solid #ef4444", marginBottom: "24px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" x2="12" y1="8" y2="12" />
+                      <line x1="12" x2="12.01" y1="16" y2="16" />
+                    </svg>
+                    Demandes de Réservation en Attente
+                  </div>
+                  <span style={{ backgroundColor: "#fee2e2", color: "#991b1b", fontSize: "0.8rem", fontWeight: 800, padding: "6px 14px", borderRadius: "20px" }}>
+                    {filteredAlertesNouvelles.length} demande(s) à décider
+                  </span>
+                </div>
 
-              {filteredAlertesNouvelles.length === 0 ? (
-                <p style={{ color: "#64748b", fontSize: "0.88rem", margin: 0 }}>Aucune réservation en attente de décision.</p>
-              ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
                   {filteredAlertesNouvelles.map((item) => (
                     <div key={item.id} style={{ backgroundColor: "#fff5f5", padding: "16px", borderRadius: "12px", border: "1px solid #fecaca" }}>
@@ -866,8 +1029,8 @@ function ProprietaireDashboardInner() {
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Arrivées du Jour & Check-in */}
             <div style={{ backgroundColor: "#ffffff", padding: "24px 26px", borderRadius: "20px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
@@ -2430,6 +2593,255 @@ function ProprietaireDashboardInner() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE RÉSERVATION DIRECTE (WALK-IN / TÉLÉPHONE) ────────────────── */}
+      {showDirectBookingModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: "20px"
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "24px",
+              width: "100%",
+              maxWidth: "600px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              border: "1px solid #e2e8f0"
+            }}
+          >
+            {/* Header Modale */}
+            <div
+              style={{
+                padding: "20px 28px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#f8fafc",
+                borderTopLeftRadius: "24px",
+                borderTopRightRadius: "24px"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", backgroundColor: "rgba(217, 107, 67, 0.12)", color: "var(--terracotta, #d96b43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>
+                  ➕
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+                    Nouvelle Réservation Directe
+                  </h3>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
+                    Enregistrez un client sur place (Walk-in) ou réservation par téléphone
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDirectBookingModal(false)}
+                style={{ backgroundColor: "transparent", border: "none", fontSize: "1.3rem", color: "#64748b", cursor: "pointer", fontWeight: 800 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulaire */}
+            <form onSubmit={handleSubmitDirectBooking} style={{ padding: "24px 28px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                {/* Choix du Riad */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                    Établissement (Riad) *
+                  </label>
+                  <select
+                    value={directBookingForm.riadId}
+                    onChange={(e) => {
+                      const newRiadId = e.target.value;
+                      setDirectBookingForm((prev) => ({ ...prev, riadId: newRiadId }));
+                      loadChambres(newRiadId, user?.id);
+                    }}
+                    required
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600, backgroundColor: "#ffffff" }}
+                  >
+                    {filteredRiads.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nom} ({r.ville})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Option Riad Entier ou Chambre */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Type de Réservation
+                    </label>
+                    <select
+                      value={directBookingForm.riadEntier ? "ENTIER" : "CHAMBRE"}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, riadEntier: e.target.value === "ENTIER" }))}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
+                    >
+                      <option value="CHAMBRE">Chambre Individuelle</option>
+                      <option value="ENTIER">Riad Entier (Exclusif)</option>
+                    </select>
+                  </div>
+
+                  {!directBookingForm.riadEntier && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                        Chambre / Suite *
+                      </label>
+                      <select
+                        value={directBookingForm.chambreId}
+                        onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, chambreId: e.target.value }))}
+                        required={!directBookingForm.riadEntier}
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
+                      >
+                        <option value="">-- Choisir une chambre --</option>
+                        {chambres.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {ch.nomChambre} ({ch.prixParNuit} MAD/nuit)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dates Séjour */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Date d'Arrivée (Check-in) *
+                    </label>
+                    <input
+                      type="date"
+                      value={directBookingForm.dateDebut}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, dateDebut: e.target.value }))}
+                      required
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Date de Départ (Check-out) *
+                    </label>
+                    <input
+                      type="date"
+                      value={directBookingForm.dateFin}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, dateFin: e.target.value }))}
+                      required
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
+
+                {/* Données Client */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Nom du Client *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Alaoui"
+                      value={directBookingForm.nom}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, nom: e.target.value }))}
+                      required
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Prénom du Client *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Yassine"
+                      value={directBookingForm.prenom}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, prenom: e.target.value }))}
+                      required
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="+212 600-000000"
+                      value={directBookingForm.telephone}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, telephone: e.target.value }))}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
+                      Mode de Règlement
+                    </label>
+                    <select
+                      value={directBookingForm.methodePaiement}
+                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, methodePaiement: e.target.value }))}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
+                    >
+                      <option value="SUR_PLACE">Sur Place (Espèces / TPE)</option>
+                      <option value="CARTE_BANCAIRE">Carte Bancaire (Confirmée)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Boutons d'action */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px", paddingTop: "18px", borderTop: "1px solid #e2e8f0" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDirectBookingModal(false)}
+                  style={{ backgroundColor: "#f1f5f9", color: "#475569", border: "none", borderRadius: "10px", padding: "10px 18px", fontSize: "0.88rem", fontWeight: 700, cursor: "pointer" }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDirectBooking}
+                  style={{
+                    backgroundColor: "var(--terracotta, #d96b43)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "10px",
+                    padding: "10px 22px",
+                    fontSize: "0.88rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 14px rgba(217, 107, 67, 0.35)",
+                    opacity: isSubmittingDirectBooking ? 0.7 : 1
+                  }}
+                >
+                  {isSubmittingDirectBooking ? "Enregistrement..." : "✓ Confirmer la Réservation"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
