@@ -49,6 +49,16 @@ public class ChambreController {
         return ResponseEntity.ok(chambre);
     }
 
+    // 3b. Modifier le statut (DISPONIBLE, RESERVEE, OCCUPEE) d'une chambre (Propriétaire)
+    @PutMapping("/api/chambres/{chambreId}/statut")
+    public ResponseEntity<Chambre> modifierStatut(
+            @RequestParam("statut") com.pfa.riad.enums.StatutChambre statut,
+            @PathVariable UUID chambreId,
+            @RequestHeader("X-User-Id") UUID proprietaireId) {
+        Chambre chambre = chambreService.modifierStatutChambre(chambreId, statut, proprietaireId);
+        return ResponseEntity.ok(chambre);
+    }
+
     // 4. Supprimer une chambre (Propriétaire)
     @DeleteMapping("/api/chambres/{chambreId}")
     public ResponseEntity<Void> supprimerChambre(

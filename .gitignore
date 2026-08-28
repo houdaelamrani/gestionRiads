@@ -30,3 +30,6 @@ Thumbs.db
 
 # Project report document
 Rapport_Projet_MoroccoRiads.doc
+
+# Database storage
+database/pgdata/

@@ -8,4 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface PaiementRepository extends JpaRepository<Paiement, UUID> {
+    java.util.List<Paiement> findByReservationId(UUID reservationId);
 }

@@ -26,7 +26,7 @@ INSERT INTO riads (id, nom, description, adresse, ville, proprietaire_id, statut
 
 -- Riads d'Essaouira (Propriétaire Khadija Tazi - owner2@riad.ma)
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a88', 'Riad Mogador Wave', 'Riad vue sur mer, design moderne mélangé à l artisanat d Essaouira.', '8 Avenue de la Plage, Essaouira', 'Essaouira', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 1200.00, TRUE, FALSE, TRUE),
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Riad Baoussala', 'Un riad champêtre hors du temps, calme absolu, idéal pour le repos et le yoga.', 'Ghazoua, Essaouira', 'Essaouira', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 1500.00, FALSE, TRUE, TRUE);
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Riad Baoussala', 'Demeure de charme et de sérénité au cœur d Essaouira.', 'Ghazoua, Essaouira', 'Essaouira', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'VALIDE', 1500.00, FALSE, TRUE, TRUE);
 
 -- 3. Insertion des Chambres
 INSERT INTO chambres (id, riad_id, nom_chambre, type_chambre, description, prix_par_nuit, capacite, disponible) VALUES

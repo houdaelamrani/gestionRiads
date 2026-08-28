@@ -33,24 +33,20 @@ public class AlertesController {
                 .filter(r -> r.getStatut() == StatutReservation.EN_ATTENTE)
                 .toList();
 
-        // 2. Arrivées du jour (Check-in = aujourd'hui ou demain)
+        // 2. Arrivées du jour (Check-in = aujourd'hui ou demain, ou en cours de séjour)
         List<Reservation> arriveesDuJour = toutesReservations.stream()
-                .filter(r -> r.getDateDebut() != null && (r.getDateDebut().isEqual(aujourdhui) || r.getDateDebut().isEqual(aujourdhui.plusDays(1))))
-                .filter(r -> r.getStatut() == StatutReservation.CONFIRMEE)
-                .toList();
-
-        // 3. Tâches de nettoyage et préparation
-        List<Reservation> nettoyage = toutesReservations.stream()
-                .filter(r -> r.getStatut() == StatutReservation.CONFIRMEE || r.getStatut() == StatutReservation.EN_ATTENTE)
-                .limit(5)
+                .filter(r -> r.getStatut() != StatutReservation.ANNULEE)
+                .filter(r -> r.getDateDebut() != null && (
+                        r.getDateDebut().isEqual(aujourdhui) ||
+                        r.getDateDebut().isEqual(aujourdhui.plusDays(1)) ||
+                        (!r.getDateDebut().isAfter(aujourdhui) && !r.getDateFin().isBefore(aujourdhui) && Boolean.FALSE.equals(r.getCheckInEffectue()))
+                ))
                 .toList();
 
         Map<String, Object> result = new HashMap<>();
-        result.put("nettoyage", nettoyage);
         result.put("arriveesAujourdhui", arriveesDuJour);
         result.put("nouvellesReservations", enAttente);
         result.put("stats", Map.of(
-                "chambresANettoyer", Math.max(1, nettoyage.size()),
                 "arriveesDuJour", arriveesDuJour.size(),
                 "reservationsEnAttente", enAttente.size()
         ));

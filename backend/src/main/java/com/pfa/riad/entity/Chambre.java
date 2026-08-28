@@ -1,5 +1,6 @@
 package com.pfa.riad.entity;
 
+import com.pfa.riad.enums.StatutChambre;
 import com.pfa.riad.enums.TypeChambre;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
@@ -52,6 +53,23 @@ public class Chambre {
     @Column(nullable = false)
     private Integer capacite;
 
+    @Builder.Default
     @Column(nullable = false)
     private Boolean disponible = true;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "statut", length = 20)
+    private StatutChambre statut = StatutChambre.DISPONIBLE;
+
+    @PrePersist
+    @PostLoad
+    public void ensureStatut() {
+        if (this.statut == null) {
+            this.statut = StatutChambre.DISPONIBLE;
+        }
+        if (this.disponible == null) {
+            this.disponible = true;
+        }
+    }
 }

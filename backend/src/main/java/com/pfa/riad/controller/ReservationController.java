@@ -22,13 +22,20 @@ public class ReservationController {
     private final ReservationService reservationService;
     private final NotificationService notificationService;
 
-    // 1. Créer une réservation (Client)
+    // 1. Créer une réservation (Client connecté ou Invité)
     @PostMapping
     public ResponseEntity<Reservation> creerReservation(
             @Valid @RequestBody ReservationRequest request,
-            @RequestHeader("X-User-Id") UUID clientId) {
+            @RequestHeader(value = "X-User-Id", required = false) UUID clientId) {
         Reservation reservation = reservationService.creerReservation(request, clientId);
         return new ResponseEntity<>(reservation, HttpStatus.CREATED);
+    }
+
+    // 1b. Récupérer le planning des dates occupées et réservées pour un Riad (Public)
+    @GetMapping("/riad/{riadId}/planning")
+    public ResponseEntity<List<com.pfa.riad.dto.PlanningDateDto>> obtenirPlanningDates(@PathVariable UUID riadId) {
+        List<com.pfa.riad.dto.PlanningDateDto> planning = reservationService.obtenirPlanningDates(riadId);
+        return ResponseEntity.ok(planning);
     }
 
     // 2. Récupérer toutes les réservations du client connecté (Client)
@@ -36,6 +43,14 @@ public class ReservationController {
     public ResponseEntity<List<Reservation>> obtenirReservationsClient(
             @RequestHeader("X-User-Id") UUID clientId) {
         List<Reservation> reservations = reservationService.obtenirReservationsClient(clientId);
+        return ResponseEntity.ok(reservations);
+    }
+
+    // 2b. Récupérer les réservations d'un invité / client par Email (Sans compte connecté)
+    @GetMapping("/guest")
+    public ResponseEntity<List<Reservation>> obtenirReservationsParEmail(
+            @RequestParam("email") String email) {
+        List<Reservation> reservations = reservationService.obtenirReservationsParEmail(email);
         return ResponseEntity.ok(reservations);
     }
 
@@ -54,6 +69,16 @@ public class ReservationController {
             @RequestParam("statut") String statut,
             @RequestHeader("X-User-Id") UUID userId) {
         Reservation reservation = reservationService.modifierStatutReservation(id, statut, userId);
+        return ResponseEntity.ok(reservation);
+    }
+
+    // 4b. Enregistrer le Check-in à l'arrivée du client (Propriétaire / Admin)
+    @PostMapping("/{id}/checkin")
+    public ResponseEntity<Reservation> effectuerCheckIn(
+            @PathVariable UUID id,
+            @Valid @RequestBody com.pfa.riad.dto.CheckInRequest request,
+            @RequestHeader("X-User-Id") UUID userId) {
+        Reservation reservation = reservationService.effectuerCheckIn(id, request, userId);
         return ResponseEntity.ok(reservation);
     }
 

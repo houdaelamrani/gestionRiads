@@ -7,8 +7,9 @@ export default function ClientIndex() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/client/catalogue");
+    router.replace("/");
   }, [router]);
 
   return null;
 }
+

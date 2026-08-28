@@ -26,6 +26,9 @@ public interface ChambreService {
     // Modifier le tarif et la capacité d'une chambre (Propriétaire)
     Chambre modifierPrixEtCapacite(UUID chambreId, java.math.BigDecimal prixParNuit, Integer capacite, UUID proprietaireId);
 
+    // Modifier le statut (DISPONIBLE, RESERVEE, OCCUPEE) d'une chambre (Propriétaire)
+    Chambre modifierStatutChambre(UUID chambreId, com.pfa.riad.enums.StatutChambre statut, UUID proprietaireId);
+
     // Modifier une chambre complète (Nom, Type, Tarif, Capacité, Description, Disponibilité)
     Chambre modifierChambre(UUID chambreId, ChambreRequest request, Boolean disponible, UUID proprietaireId);
 }

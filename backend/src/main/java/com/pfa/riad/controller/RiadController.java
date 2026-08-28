@@ -19,6 +19,7 @@ import java.util.UUID;
 public class RiadController {
 
     private final RiadService riadService;
+    private final com.pfa.riad.service.ReservationService reservationService;
 
     // 1. Ajouter un Riad (Propriétaire)
     // L'ID du propriétaire est transmis dans l'en-tête HTTP 'X-User-Id' (injecté après connexion)
@@ -43,6 +44,13 @@ public class RiadController {
     public ResponseEntity<Riad> obtenirRiadParId(@PathVariable UUID id) {
         Riad riad = riadService.obtenirRiadParId(id);
         return ResponseEntity.ok(riad);
+    }
+
+    // 3b. Obtenir les dates occupées et réservées pour le calendrier d'un Riad (Public)
+    @GetMapping("/{id}/planning-dates")
+    public ResponseEntity<List<com.pfa.riad.dto.PlanningDateDto>> obtenirPlanningDatesRiad(@PathVariable UUID id) {
+        List<com.pfa.riad.dto.PlanningDateDto> planning = reservationService.obtenirPlanningDates(id);
+        return ResponseEntity.ok(planning);
     }
 
     // 4. Rechercher et filtrer les Riads validés par ville (Public - Client)

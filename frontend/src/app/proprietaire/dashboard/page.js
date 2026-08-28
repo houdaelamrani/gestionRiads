@@ -4,9 +4,10 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
+import AvailabilityCalendar from "@/components/AvailabilityCalendar";
 
 function ProprietaireDashboardInner() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const searchParams = useSearchParams();
   const activeTab = searchParams ? searchParams.get("tab") || "dashboard" : "dashboard";
 
@@ -15,10 +16,33 @@ function ProprietaireDashboardInner() {
   const [selectedRiadId, setSelectedRiadId] = useState("");
   const [chambres, setChambres] = useState([]);
   const [reservations, setReservations] = useState([]);
-  const [alertes, setAlertes] = useState({ nettoyage: [], arriveesAujourdhui: [], nouvellesReservations: [], stats: {} });
+  const [planningDates, setPlanningDates] = useState([]);
+  const [selectedPlanningRoomId, setSelectedPlanningRoomId] = useState("ALL");
+  const [alertes, setAlertes] = useState({ arriveesAujourdhui: [], nouvellesReservations: [], stats: {} });
   const [toastMessage, setToastMessage] = useState("");
   const [selectedCityFilter, setSelectedCityFilter] = useState("Toutes");
   const [reservationFilter, setReservationFilter] = useState("TOUTES");
+
+  // Modale de Check-in Client à l'arrivée
+  const [checkInReservation, setCheckInReservation] = useState(null);
+  const [isSubmittingCheckIn, setIsSubmittingCheckIn] = useState(false);
+  const [checkInForm, setCheckInForm] = useState({
+    nom: "",
+    prenom: "",
+    email: "",
+    telephone: "",
+    typePieceIdentite: "CIN",
+    numeroPieceIdentite: "",
+    nationalite: "Marocaine",
+    dateNaissance: "",
+    nombrePersonnes: 2,
+    remarques: "",
+    paiementEffectueSurPlace: true,
+    methodePaiementSurPlace: "ESPECES"
+  });
+
+  // Modale de Consultation / Impression Fiche Check-in (Police)
+  const [viewingCheckInVoucher, setViewingCheckInVoucher] = useState(null);
 
   // Modale de suppression chambre
   const [roomToDelete, setRoomToDelete] = useState(null);
@@ -175,6 +199,7 @@ function ProprietaireDashboardInner() {
           setEditRiadFile(null);
           setEditRiadFilePreview("");
           loadChambres(activeRiad.id, ownerId);
+          loadPlanningDates(activeRiad.id);
         }
       }
 
@@ -195,6 +220,19 @@ function ProprietaireDashboardInner() {
       }
     } catch (err) {
       console.error("Erreur chargement données propriétaire :", err);
+    }
+  };
+
+  const loadPlanningDates = async (riadId) => {
+    if (!riadId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/riads/${riadId}/planning-dates`);
+      if (res.ok) {
+        const data = await res.json();
+        setPlanningDates(data);
+      }
+    } catch (e) {
+      console.error("Erreur chargement planning :", e);
     }
   };
 
@@ -241,7 +279,10 @@ function ProprietaireDashboardInner() {
     });
     setEditRiadFile(null);
     setEditRiadFilePreview("");
-    if (user) loadChambres(riad.id, user.id);
+    if (user) {
+      loadChambres(riad.id, user.id);
+      loadPlanningDates(riad.id);
+    }
   };
 
   const handleCreateRiad = async (e) => {
@@ -521,19 +562,96 @@ function ProprietaireDashboardInner() {
     }
   };
 
+  const handleChangeRoomStatut = async (chambreId, newStatut) => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/chambres/${chambreId}/statut?statut=${newStatut}`, {
+        method: "PUT",
+        headers: {
+          "X-User-Id": user.id
+        }
+      });
+      if (res.ok) {
+        showToast(`Statut de la chambre mis à jour : ${newStatut}`);
+        loadChambres(selectedRiadId, user.id);
+      } else {
+        alert("Erreur lors de la mise à jour du statut.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau.");
+    }
+  };
+
   const handleUpdateReservationStatus = async (id, newStatut) => {
     if (!user) return;
     try {
       const res = await fetch(`${API_BASE}/api/reservations/${id}/statut?statut=${newStatut}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "X-User-Id": user.id }
       });
       if (res.ok) {
-        showToast(`Réservation ${newStatut === "CONFIRMEE" ? "confirmée" : "refusée"}.`);
+        showToast(
+          newStatut === "CONFIRMEE"
+            ? "Paiement validé ! Réservation confirmée et chambre(s) passée(s) en OCCUPÉE."
+            : `Réservation ${newStatut === "REFUSEE" ? "refusée" : "mise à jour"}.`
+        );
         loadOwnerData(user.id, selectedRiadId);
+      } else {
+        alert("Erreur lors de la mise à jour de la réservation.");
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleOpenCheckInModal = (reservation) => {
+    setCheckInReservation(reservation);
+    const client = reservation.client || {};
+    setCheckInForm({
+      nom: reservation.clientNom || client.nom || "",
+      prenom: reservation.clientPrenom || client.prenom || "",
+      email: reservation.clientEmail || client.email || "",
+      telephone: reservation.clientTelephone || client.telephone || "",
+      typePieceIdentite: reservation.clientTypePieceIdentite || "CIN",
+      numeroPieceIdentite: reservation.clientNumeroPieceIdentite || "",
+      nationalite: reservation.clientNationalite || "Marocaine",
+      dateNaissance: reservation.clientDateNaissance || "",
+      nombrePersonnes: reservation.nombrePersonnes || (reservation.chambres && reservation.chambres.length > 0 ? reservation.chambres.reduce((acc, c) => acc + (c.capacite || 2), 0) : 2),
+      remarques: reservation.remarquesCheckIn || "",
+      paiementEffectueSurPlace: true,
+      methodePaiementSurPlace: "ESPECES"
+    });
+  };
+
+  const handleSubmitCheckIn = async (e) => {
+    e.preventDefault();
+    if (!checkInReservation || !user) return;
+    setIsSubmittingCheckIn(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/reservations/${checkInReservation.id}/checkin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": user.id
+        },
+        body: JSON.stringify(checkInForm)
+      });
+      if (res.ok) {
+        const updatedResa = await res.json();
+        showToast("✨ Check-in validé avec succès ! Arrivée du client confirmée.");
+        setCheckInReservation(null);
+        loadOwnerData(user.id, selectedRiadId);
+        setViewingCheckInVoucher(updatedResa);
+      } else {
+        const errorText = await res.text();
+        alert("Erreur lors de l'enregistrement du check-in : " + errorText);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau lors de l'enregistrement du check-in.");
+    } finally {
+      setIsSubmittingCheckIn(false);
     }
   };
 
@@ -588,7 +706,6 @@ function ProprietaireDashboardInner() {
   });
   const filteredAlertesNouvelles = alertes.nouvellesReservations || [];
   const filteredAlertesArrivees = alertes.arriveesAujourdhui || [];
-  const filteredAlertesNettoyage = alertes.nettoyage || [];
 
   const selectedRiad = riads.find((r) => r.id === selectedRiadId) || riads[0];
 
@@ -706,11 +823,43 @@ function ProprietaireDashboardInner() {
                       <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "0.92rem" }}>Réservation #{item.id.substring(0, 8)}</div>
                       <div style={{ color: "#475569", fontSize: "0.82rem", marginTop: "4px" }}>Séjour : Du {item.dateDebut} au {item.dateFin}</div>
                       <div style={{ fontWeight: 800, color: "#1e293b", fontSize: "0.9rem", marginTop: "4px" }}>Total : {item.prixTotal} MAD</div>
-                      <div style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
-                        <button onClick={() => handleUpdateReservationStatus(item.id, "CONFIRMEE")} style={{ flex: 1, backgroundColor: "#10b981", color: "#ffffff", border: "none", borderRadius: "8px", padding: "8px 14px", fontSize: "0.82rem", fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)" }}>
-                          Accepter
+                      <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
+                        <button
+                          onClick={() => handleUpdateReservationStatus(item.id, "CONFIRMEE")}
+                          style={{
+                            flex: 1.4,
+                            backgroundColor: "#10b981",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "8px 10px",
+                            fontSize: "0.8rem",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "4px"
+                          }}
+                          title="Valider le paiement et passer la chambre en OCCUPÉE"
+                        >
+                          💵 Encaisser & Occuper
                         </button>
-                        <button onClick={() => handleUpdateReservationStatus(item.id, "REFUSEE")} style={{ flex: 1, backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "8px", padding: "8px 14px", fontSize: "0.82rem", fontWeight: 800, cursor: "pointer" }}>
+                        <button
+                          onClick={() => handleUpdateReservationStatus(item.id, "REFUSEE")}
+                          style={{
+                            flex: 0.8,
+                            backgroundColor: "#ef4444",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "8px 10px",
+                            fontSize: "0.8rem",
+                            fontWeight: 800,
+                            cursor: "pointer"
+                          }}
+                        >
                           Refuser
                         </button>
                       </div>
@@ -720,81 +869,139 @@ function ProprietaireDashboardInner() {
               )}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
-              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.98rem", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 20h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
-                    </svg>
-                    Arrivées du Jour (Check-in)
+            {/* Arrivées du Jour & Check-in */}
+            <div style={{ backgroundColor: "#ffffff", padding: "24px 26px", borderRadius: "20px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+                <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "1.02rem", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ width: "34px", height: "34px", borderRadius: "10px", backgroundColor: "#e0f2fe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>
+                    🛎️
                   </div>
-                  <span style={{ backgroundColor: "#e0f2fe", color: "#0369a1", fontSize: "0.75rem", fontWeight: 800, padding: "4px 12px", borderRadius: "16px" }}>
-                    {filteredAlertesArrivees.length} client(s)
-                  </span>
+                  <div>
+                    <div>Arrivées du Jour (Check-in)</div>
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Enregistrement & vérification d'identité</div>
+                  </div>
                 </div>
-
-                {filteredAlertesArrivees.length === 0 ? (
-                  <p style={{ color: "#64748b", fontSize: "0.85rem", margin: 0 }}>Aucun check-in prévu aujourd'hui.</p>
-                ) : (
-                  filteredAlertesArrivees.map((item) => (
-                    <div key={item.id} style={{ backgroundColor: "#f0f9ff", padding: "14px", borderRadius: "10px", marginBottom: "10px", borderLeft: "4px solid #0284c7" }}>
-                      <div style={{ fontWeight: 800, color: "#0369a1", fontSize: "0.88rem" }}>Arrivée confirmée le {item.dateDebut}</div>
-                      <div style={{ color: "#475569", fontSize: "0.8rem", marginTop: "2px" }}>Montant total : {item.prixTotal} MAD</div>
-                    </div>
-                  ))
-                )}
+                <span style={{ backgroundColor: "#e0f2fe", color: "#0369a1", fontSize: "0.78rem", fontWeight: 800, padding: "5px 14px", borderRadius: "20px" }}>
+                  {filteredAlertesArrivees.length} client(s)
+                </span>
               </div>
 
-              <div style={{ backgroundColor: "#ffffff", padding: "24px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.98rem", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                    Nettoyage & Préparation
-                  </div>
-                  <span style={{ backgroundColor: "#fef3c7", color: "#b45309", fontSize: "0.75rem", fontWeight: 800, padding: "4px 12px", borderRadius: "16px" }}>
-                    {filteredAlertesNettoyage.length} tâche(s)
-                  </span>
+              {filteredAlertesArrivees.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 12px", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1px dashed #cbd5e1" }}>
+                  <div style={{ fontSize: "1.8rem", marginBottom: "6px" }}>🌴</div>
+                  <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600 }}>Aucun check-in prévu pour aujourd'hui.</p>
                 </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {filteredAlertesArrivees.map((item) => {
+                    const clientName = (item.clientPrenom || item.client?.prenom || "") + " " + (item.clientNom || item.client?.nom || "Client Invité");
+                    const roomName = item.riadEntier ? "Riad Entier" : (item.chambres && item.chambres.length > 0 ? item.chambres.map(c => c.nomChambre).join(", ") : "Chambre");
+                    const isCheckedIn = Boolean(item.checkInEffectue);
 
-                {filteredAlertesNettoyage.length === 0 ? (
-                  <p style={{ color: "#64748b", fontSize: "0.85rem", margin: 0 }}>Chambres prêtes pour l'accueil.</p>
-                ) : (
-                  filteredAlertesNettoyage.map((item) => (
-                    <div key={item.id} style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", marginBottom: "10px", border: "1px solid #e2e8f0" }}>
-                      <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.88rem" }}>Réservation #{item.id.substring(0, 8)}</div>
-                      <div style={{ color: "#64748b", fontSize: "0.8rem", marginTop: "2px" }}>Séjour : Du {item.dateDebut} au {item.dateFin}</div>
-                      <button
-                        onClick={() => showToast("Statut de la chambre mis à jour.")}
-                        style={{ marginTop: "10px", backgroundColor: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", color: "#0f172a" }}
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          backgroundColor: isCheckedIn ? "#f0fdf4" : "#f0f9ff",
+                          padding: "16px 18px",
+                          borderRadius: "14px",
+                          border: isCheckedIn ? "1px solid #bbf7d0" : "1px solid #bae6fd",
+                          borderLeft: isCheckedIn ? "5px solid #16a34a" : "5px solid #0284c7"
+                        }}
                       >
-                        Valider Chambre Prête
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                          <div>
+                            <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.94rem" }}>
+                              👤 {clientName.trim()}
+                            </div>
+                            <div style={{ color: "#475569", fontSize: "0.8rem", marginTop: "2px" }}>
+                              🛏️ {roomName} • Séjour du <strong>{item.dateDebut}</strong> au <strong>{item.dateFin}</strong>
+                            </div>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              padding: "4px 10px",
+                              borderRadius: "12px",
+                              backgroundColor: isCheckedIn ? "#dcfce7" : "#fef3c7",
+                              color: isCheckedIn ? "#15803d" : "#b45309"
+                            }}
+                          >
+                            {isCheckedIn ? "✓ CHECK-IN EFFECTUÉ" : "⏳ ATTENDU"}
+                          </span>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", paddingTop: "10px", borderTop: isCheckedIn ? "1px solid #dcfce7" : "1px solid #e0f2fe" }}>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a" }}>
+                            Total : {item.prixTotal} MAD
+                          </div>
+
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            {!isCheckedIn ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCheckInModal(item)}
+                                style={{
+                                  backgroundColor: "var(--terracotta, #d96b43)",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  padding: "7px 14px",
+                                  fontSize: "0.8rem",
+                                  fontWeight: 800,
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 10px rgba(217, 107, 67, 0.3)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "5px"
+                                }}
+                              >
+                                🔑 Effectuer le Check-in
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setViewingCheckInVoucher(item)}
+                                style={{
+                                  backgroundColor: "#ffffff",
+                                  color: "#16a34a",
+                                  border: "1px solid #86efac",
+                                  borderRadius: "8px",
+                                  padding: "6px 12px",
+                                  fontSize: "0.78rem",
+                                  fontWeight: 800,
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "5px"
+                                }}
+                              >
+                                📄 Voir Fiche Check-in
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </section>
+
           {/* ── SUIVI DES RÉSERVATIONS (Intégré dans le Tableau de Bord Opérationnel) ── */}
-          <section style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
+          <section style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "20px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "16px" }}>
               <div>
                 <h2 style={{ fontSize: "1.25rem", color: "#0f172a", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                    <path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
-                    <path d="M12 11h4" />
-                    <path d="M12 16h4" />
-                    <path d="M8 11h.01" />
-                    <path d="M8 16h.01" />
-                  </svg>
-                  Suivi des Réservations
+                  <div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: "rgba(217, 107, 67, 0.12)", color: "var(--terracotta, #d96b43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>
+                    📜
+                  </div>
+                  Suivi des Réservations & Check-in
                 </h2>
                 <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
-                  Consultez, filtrez et traitez les réservations de votre établissement en temps réel.
+                  Consultez, enregistrez le check-in des clients à l'arrivée et imprimez les fiches officielles.
                 </p>
               </div>
 
@@ -840,56 +1047,145 @@ function ProprietaireDashboardInner() {
                   <thead>
                     <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
                       <th style={{ padding: "12px 10px", fontWeight: 800 }}>ID Réservation</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Date Début</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Date Fin</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Montant Total</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Client</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Dates Séjour</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Montant</th>
                       <th style={{ padding: "12px 10px", fontWeight: 800 }}>Statut</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Check-in</th>
                       <th style={{ padding: "12px 10px", fontWeight: 800, textAlign: "right" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedReservations.map((r) => (
-                      <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                        <td style={{ padding: "14px 10px", fontWeight: 700, color: "#0f172a" }}>#{r.id.substring(0, 8)}</td>
-                        <td style={{ padding: "14px 10px", color: "#475569" }}>{r.dateDebut}</td>
-                        <td style={{ padding: "14px 10px", color: "#475569" }}>{r.dateFin}</td>
-                        <td style={{ padding: "14px 10px", fontWeight: 800, color: "#0f172a" }}>{r.prixTotal} MAD</td>
-                        <td style={{ padding: "14px 10px" }}>
-                          <span
-                            style={{
-                              padding: "4px 10px",
-                              borderRadius: "20px",
-                              fontSize: "0.75rem",
-                              fontWeight: 800,
-                              backgroundColor:
-                                r.statut === "CONFIRMEE" ? "#dcfce7" : r.statut === "REFUSEE" ? "#fee2e2" : "#fef3c7",
-                              color:
-                                r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309"
-                            }}
-                          >
-                            {r.statut}
-                          </span>
-                        </td>
-                        <td style={{ padding: "14px 10px", textAlign: "right" }}>
-                          {r.statut === "EN_ATTENTE" && (
-                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                              <button
-                                onClick={() => handleUpdateReservationStatus(r.id, "CONFIRMEE")}
-                                style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
+                    {displayedReservations.map((r) => {
+                      const clientName = (r.clientPrenom || r.client?.prenom || "") + " " + (r.clientNom || r.client?.nom || "Invité");
+                      const isCheckedIn = Boolean(r.checkInEffectue);
+
+                      return (
+                        <tr key={r.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                          <td style={{ padding: "14px 10px", fontWeight: 700, color: "#0f172a" }}>
+                            #{r.id.substring(0, 8)}
+                          </td>
+                          <td style={{ padding: "14px 10px" }}>
+                            <div style={{ fontWeight: 800, color: "#0f172a" }}>{clientName.trim()}</div>
+                            <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{r.clientTelephone || r.client?.telephone || r.clientEmail || r.client?.email || ""}</div>
+                          </td>
+                          <td style={{ padding: "14px 10px", color: "#475569", fontSize: "0.82rem" }}>
+                            Du {r.dateDebut} au {r.dateFin}
+                          </td>
+                          <td style={{ padding: "14px 10px", fontWeight: 800, color: "#0f172a" }}>
+                            {r.prixTotal} MAD
+                          </td>
+                          <td style={{ padding: "14px 10px" }}>
+                            <span
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: "20px",
+                                fontSize: "0.75rem",
+                                fontWeight: 800,
+                                backgroundColor:
+                                  r.statut === "CONFIRMEE" ? "#dcfce7" : r.statut === "REFUSEE" ? "#fee2e2" : "#fef3c7",
+                                color:
+                                  r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309"
+                              }}
+                            >
+                              {r.statut}
+                            </span>
+                          </td>
+                          <td style={{ padding: "14px 10px" }}>
+                            {isCheckedIn ? (
+                              <span
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: "20px",
+                                  fontSize: "0.74rem",
+                                  fontWeight: 800,
+                                  backgroundColor: "#dcfce7",
+                                  color: "#15803d",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px"
+                                }}
                               >
-                                Accepter
-                              </button>
-                              <button
-                                onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")}
-                                style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
+                                ✓ Effectué {r.clientNumeroPieceIdentite ? `(${r.clientNumeroPieceIdentite})` : ""}
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: "20px",
+                                  fontSize: "0.74rem",
+                                  fontWeight: 700,
+                                  backgroundColor: "#f1f5f9",
+                                  color: "#64748b"
+                                }}
                               >
-                                Refuser
-                              </button>
+                                Non effectué
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "14px 10px", textAlign: "right" }}>
+                            <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                              {!isCheckedIn && r.statut !== "ANNULEE" && r.statut !== "REFUSEE" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCheckInModal(r)}
+                                  style={{
+                                    backgroundColor: "var(--terracotta, #d96b43)",
+                                    color: "#ffffff",
+                                    border: "none",
+                                    borderRadius: "8px",
+                                    padding: "6px 12px",
+                                    fontSize: "0.78rem",
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    boxShadow: "0 2px 8px rgba(217, 107, 67, 0.25)"
+                                  }}
+                                  title="Enregistrer les informations d'identité du client pour le check-in"
+                                >
+                                  🔑 Check-in
+                                </button>
+                              )}
+
+                              {isCheckedIn && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingCheckInVoucher(r)}
+                                  style={{
+                                    backgroundColor: "#ffffff",
+                                    color: "#0f172a",
+                                    border: "1px solid #cbd5e1",
+                                    borderRadius: "8px",
+                                    padding: "6px 10px",
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px"
+                                  }}
+                                  title="Consulter ou imprimer la fiche de police / check-in"
+                                >
+                                  📄 Fiche
+                                </button>
+                              )}
+
+                              {r.statut === "EN_ATTENTE" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")}
+                                  style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "8px", padding: "6px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
+                                >
+                                  Refuser
+                                </button>
+                              )}
                             </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -953,16 +1249,36 @@ function ProprietaireDashboardInner() {
                         position: "absolute",
                         top: "12px",
                         right: "12px",
-                        backgroundColor: ch.disponible ? "#dcfce7" : "#ffe4e6",
-                        color: ch.disponible ? "#15803d" : "#991b1b",
+                        backgroundColor:
+                          ch.statut === "OCCUPEE"
+                            ? "#fee2e2"
+                            : ch.statut === "RESERVEE"
+                            ? "#fef3c7"
+                            : "#dcfce7",
+                        color:
+                          ch.statut === "OCCUPEE"
+                            ? "#991b1b"
+                            : ch.statut === "RESERVEE"
+                            ? "#b45309"
+                            : "#15803d",
                         fontSize: "0.75rem",
                         fontWeight: 800,
                         padding: "5px 12px",
                         borderRadius: "20px",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                        border:
+                          ch.statut === "OCCUPEE"
+                            ? "1px solid #fecaca"
+                            : ch.statut === "RESERVEE"
+                            ? "1px solid #fde68a"
+                            : "1px solid #bbf7d0"
                       }}
                     >
-                      {ch.disponible ? "Disponible" : "Masquée"}
+                      {ch.statut === "OCCUPEE"
+                        ? "🔴 Occupée"
+                        : ch.statut === "RESERVEE"
+                        ? "🟡 Réservée (Paiement sur place)"
+                        : "🟢 Disponible"}
                     </span>
                   </div>
 
@@ -982,6 +1298,63 @@ function ProprietaireDashboardInner() {
 
                     <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--primary-dark)" }}>
                       {ch.prixParNuit} <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>MAD / nuit</span>
+                    </div>
+
+                    {/* Sélecteur des 3 États de la Chambre */}
+                    <div style={{ marginTop: "14px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                        État actuel :
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleChangeRoomStatut(ch.id, "DISPONIBLE")}
+                          style={{
+                            padding: "6px 2px",
+                            borderRadius: "8px",
+                            fontSize: "0.74rem",
+                            fontWeight: ch.statut === "DISPONIBLE" || !ch.statut ? 800 : 600,
+                            backgroundColor: ch.statut === "DISPONIBLE" || !ch.statut ? "#dcfce7" : "#f8fafc",
+                            color: ch.statut === "DISPONIBLE" || !ch.statut ? "#15803d" : "#64748b",
+                            border: ch.statut === "DISPONIBLE" || !ch.statut ? "2px solid #16a34a" : "1px solid #e2e8f0",
+                            cursor: "pointer"
+                          }}
+                        >
+                          🟢 Dispo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleChangeRoomStatut(ch.id, "RESERVEE")}
+                          style={{
+                            padding: "6px 2px",
+                            borderRadius: "8px",
+                            fontSize: "0.74rem",
+                            fontWeight: ch.statut === "RESERVEE" ? 800 : 600,
+                            backgroundColor: ch.statut === "RESERVEE" ? "#fef3c7" : "#f8fafc",
+                            color: ch.statut === "RESERVEE" ? "#b45309" : "#64748b",
+                            border: ch.statut === "RESERVEE" ? "2px solid #d97706" : "1px solid #e2e8f0",
+                            cursor: "pointer"
+                          }}
+                        >
+                          🟡 Réservée
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleChangeRoomStatut(ch.id, "OCCUPEE")}
+                          style={{
+                            padding: "6px 2px",
+                            borderRadius: "8px",
+                            fontSize: "0.74rem",
+                            fontWeight: ch.statut === "OCCUPEE" ? 800 : 600,
+                            backgroundColor: ch.statut === "OCCUPEE" ? "#fee2e2" : "#f8fafc",
+                            color: ch.statut === "OCCUPEE" ? "#991b1b" : "#64748b",
+                            border: ch.statut === "OCCUPEE" ? "2px solid #ef4444" : "1px solid #e2e8f0",
+                            cursor: "pointer"
+                          }}
+                        >
+                          🔴 Occupée
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1053,6 +1426,186 @@ function ProprietaireDashboardInner() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── VUE : PLANNING & CALENDRIER DES DISPONIBILITÉS (tab=planning) ─────────── */}
+      {activeTab === "planning" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {/* En-tête avec Sélecteur de Riad et Sélecteur de Chambre */}
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              padding: "24px 28px",
+              borderRadius: "18px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              border: "1px solid #e2e8f0",
+              display: "flex",
+              flexDirection: "column",
+              gap: "18px"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: "0 0 4px 0" }}>
+                  📅 Planning & Calendrier des Disponibilités
+                </h2>
+                <p style={{ color: "#64748b", margin: 0, fontSize: "0.88rem" }}>
+                  Visualisez les jours réservés (🟡 acompte requis) et occupés (🔴 payés/confirmés) pour chaque chambre et le Riad entier.
+                </p>
+              </div>
+
+              {/* Sélecteur de Riad si le propriétaire en possède plusieurs */}
+              {filteredRiads.length > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#64748b" }}>Riad :</span>
+                  {filteredRiads.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => handleSelectRiad(r)}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "8px",
+                        fontSize: "0.82rem",
+                        fontWeight: r.id === selectedRiadId ? 800 : 600,
+                        backgroundColor: r.id === selectedRiadId ? "rgba(217, 107, 67, 0.12)" : "#f8fafc",
+                        color: r.id === selectedRiadId ? "var(--terracotta)" : "#475569",
+                        border: r.id === selectedRiadId ? "1.5px solid var(--terracotta)" : "1px solid #cbd5e1",
+                        cursor: "pointer"
+                      }}
+                    >
+                      🏰 {r.nom}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sélecteur de Chambre / Riad Entier */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", paddingTop: "14px", borderTop: "1px solid #f1f5f9" }}>
+              <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Filtrer par :
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanningRoomId("ALL")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  fontSize: "0.84rem",
+                  fontWeight: selectedPlanningRoomId === "ALL" ? 800 : 600,
+                  backgroundColor: selectedPlanningRoomId === "ALL" ? "var(--terracotta)" : "#f8fafc",
+                  color: selectedPlanningRoomId === "ALL" ? "#ffffff" : "#475569",
+                  border: selectedPlanningRoomId === "ALL" ? "none" : "1px solid #cbd5e1",
+                  cursor: "pointer"
+                }}
+              >
+                Vue Globale
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanningRoomId("ENTIRE_RIAD")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "10px",
+                  fontSize: "0.84rem",
+                  fontWeight: selectedPlanningRoomId === "ENTIRE_RIAD" ? 800 : 600,
+                  backgroundColor: selectedPlanningRoomId === "ENTIRE_RIAD" ? "var(--terracotta)" : "#f8fafc",
+                  color: selectedPlanningRoomId === "ENTIRE_RIAD" ? "#ffffff" : "#475569",
+                  border: selectedPlanningRoomId === "ENTIRE_RIAD" ? "none" : "1px solid #cbd5e1",
+                  cursor: "pointer"
+                }}
+              >
+                ✨ Riad Entier
+              </button>
+              {chambres.map((ch) => (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => setSelectedPlanningRoomId(ch.id)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "10px",
+                    fontSize: "0.84rem",
+                    fontWeight: selectedPlanningRoomId === ch.id ? 800 : 600,
+                    backgroundColor: selectedPlanningRoomId === ch.id ? "var(--terracotta)" : "#f8fafc",
+                    color: selectedPlanningRoomId === ch.id ? "#ffffff" : "#475569",
+                    border: selectedPlanningRoomId === ch.id ? "none" : "1px solid #cbd5e1",
+                    cursor: "pointer"
+                  }}
+                >
+                  🛏️ {ch.nomChambre}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Composant Calendrier des Disponibilités */}
+          <div style={{ backgroundColor: "#ffffff", borderRadius: "18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", padding: "8px" }}>
+            <AvailabilityCalendar
+              planningDates={planningDates}
+              selectedRoomId={selectedPlanningRoomId === "ALL" || selectedPlanningRoomId === "ENTIRE_RIAD" ? null : selectedPlanningRoomId}
+              isRiadEntier={selectedPlanningRoomId === "ENTIRE_RIAD"}
+              interactive={false}
+              language={language}
+            />
+          </div>
+
+          {/* Liste des Réservations associées au planning */}
+          <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>
+              📋 Détail des Réservations Enregistrées sur ce Riad
+            </h3>
+
+            {planningDates.length === 0 ? (
+              <p style={{ color: "#64748b", margin: 0, fontSize: "0.9rem" }}>
+                Aucune réservation enregistrée pour ce Riad actuellement.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+                {planningDates.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      backgroundColor: item.statut === "OCCUPE" ? "#fef2f2" : "#fffbeb",
+                      border: `1.5px solid ${item.statut === "OCCUPE" ? "#fca5a5" : "#fcd34d"}`,
+                      borderRadius: "14px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px"
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <strong style={{ fontSize: "0.95rem", color: item.statut === "OCCUPE" ? "#991b1b" : "#92400e" }}>
+                        {item.nomChambre || (item.riadEntier ? "Riad Entier" : "Chambre")}
+                      </strong>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 800,
+                          padding: "3px 8px",
+                          borderRadius: "12px",
+                          backgroundColor: item.statut === "OCCUPE" ? "#fee2e2" : "#fef3c7",
+                          color: item.statut === "OCCUPE" ? "#b91c1c" : "#b45309",
+                          border: `1px solid ${item.statut === "OCCUPE" ? "#fca5a5" : "#fde68a"}`
+                        }}
+                      >
+                        {item.statut === "OCCUPE" ? "🔴 OCCUPÉE (Payée)" : "🟡 RÉSERVÉE (Acompte)"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "0.85rem", color: "#334155" }}>
+                      📅 <strong>Du {item.dateDebut} au {item.dateFin}</strong>
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
+                      Statut : {item.statutReservation || item.statut}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1477,6 +2030,405 @@ function ProprietaireDashboardInner() {
             <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
               <button onClick={() => setRoomToDelete(null)} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>Annuler</button>
               <button onClick={confirmDeleteRoom} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#ffffff", fontWeight: 700, cursor: "pointer" }}>Oui, Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE CHECK-IN CLIENT À L'ARRIVÉE ───────────────────────────────── */}
+      {checkInReservation && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15, 23, 42, 0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: "20px" }}>
+          <div style={{ backgroundColor: "#ffffff", borderRadius: "24px", maxWidth: "680px", width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.3)", border: "1px solid #e2e8f0" }}>
+            
+            {/* En-tête de Luxe Marocain */}
+            <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, var(--terracotta, #d96b43) 100%)", color: "#ffffff", padding: "26px 32px", borderRadius: "24px 24px 0 0", position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                  <div style={{ width: "46px", height: "46px", borderRadius: "14px", backgroundColor: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem" }}>
+                    🛎️
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.3rem", fontWeight: 800, margin: 0, letterSpacing: "-0.2px" }}>
+                      Check-in & Enregistrement Client
+                    </h3>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "0.84rem", opacity: 0.85 }}>
+                      Enregistrement d'arrivée au {checkInReservation.riad?.nom || selectedRiad?.nom || "Riad"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCheckInReservation(null)}
+                  style={{ background: "none", border: "none", color: "#ffffff", fontSize: "1.4rem", cursor: "pointer", opacity: 0.8 }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Récapitulatif du séjour */}
+            <div style={{ padding: "18px 32px", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", fontSize: "0.84rem" }}>
+              <div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>N° Réservation</div>
+                <div style={{ color: "#0f172a", fontWeight: 800 }}>#{checkInReservation.id.substring(0, 8)}</div>
+              </div>
+              <div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>Dates du Séjour</div>
+                <div style={{ color: "#0f172a", fontWeight: 800 }}>Du {checkInReservation.dateDebut} au {checkInReservation.dateFin}</div>
+              </div>
+              <div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>Hébergement</div>
+                <div style={{ color: "#0f172a", fontWeight: 800 }}>{checkInReservation.riadEntier ? "Riad Entier" : (checkInReservation.chambres && checkInReservation.chambres.length > 0 ? checkInReservation.chambres.map(c => c.nomChambre).join(", ") : "Chambre")}</div>
+              </div>
+              <div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>Montant Total</div>
+                <div style={{ color: "var(--terracotta, #d96b43)", fontWeight: 800, fontSize: "0.95rem" }}>{checkInReservation.prixTotal} MAD</div>
+              </div>
+            </div>
+
+            {/* Formulaire de saisie d'identité */}
+            <form onSubmit={handleSubmitCheckIn} style={{ padding: "28px 32px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
+                    Nom du client *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={checkInForm.nom}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, nom: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", fontWeight: 600 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
+                    Prénom du client *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={checkInForm.prenom}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, prenom: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+
+              {/* Pièce d'identité : CIN / Passeport */}
+              <div style={{ backgroundColor: "#fef3c7", padding: "16px 20px", borderRadius: "14px", border: "1px solid #fde68a", marginBottom: "18px" }}>
+                <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#92400e", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🪪</span> Informations d'Identité Légale (Fiche de Police)
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
+                      Type de pièce *
+                    </label>
+                    <select
+                      value={checkInForm.typePieceIdentite}
+                      onChange={(e) => setCheckInForm({ ...checkInForm, typePieceIdentite: e.target.value })}
+                      style={{ width: "100%", padding: "9px 10px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontWeight: 700, fontSize: "0.85rem", color: "#78350f" }}
+                    >
+                      <option value="CIN">CIN Marocaine</option>
+                      <option value="PASSEPORT">Passeport Étranger</option>
+                      <option value="CARTE_SEJOUR">Carte de Séjour</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
+                      Numéro de pièce (CIN / Passeport) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: BE890123 / P1234567"
+                      value={checkInForm.numeroPieceIdentite}
+                      onChange={(e) => setCheckInForm({ ...checkInForm, numeroPieceIdentite: e.target.value.toUpperCase() })}
+                      style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontWeight: 800, fontSize: "0.88rem", letterSpacing: "0.5px" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
+                      Nationalité
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Marocaine"
+                      value={checkInForm.nationalite}
+                      onChange={(e) => setCheckInForm({ ...checkInForm, nationalite: e.target.value })}
+                      style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontWeight: 600, fontSize: "0.85rem" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
+                      Date de naissance
+                    </label>
+                    <input
+                      type="date"
+                      value={checkInForm.dateNaissance}
+                      onChange={(e) => setCheckInForm({ ...checkInForm, dateNaissance: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontSize: "0.85rem" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
+                      Nombre d'occupants
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={checkInForm.nombrePersonnes}
+                      onChange={(e) => setCheckInForm({ ...checkInForm, nombrePersonnes: parseInt(e.target.value) || 1 })}
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontSize: "0.85rem", fontWeight: 700 }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Coordonnées de contact */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
+                    Téléphone de contact
+                  </label>
+                  <input
+                    type="tel"
+                    value={checkInForm.telephone}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, telephone: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
+                    Email du voyageur
+                  </label>
+                  <input
+                    type="email"
+                    value={checkInForm.email}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, email: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                  />
+                </div>
+              </div>
+
+              {/* Encaissement à l'arrivée */}
+              <div style={{ backgroundColor: "#f0fdf4", padding: "14px 18px", borderRadius: "12px", border: "1px solid #bbf7d0", marginBottom: "16px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: 800, color: "#166534", fontSize: "0.88rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={checkInForm.paiementEffectueSurPlace}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, paiementEffectueSurPlace: e.target.checked })}
+                    style={{ width: "18px", height: "18px", accentColor: "#16a34a" }}
+                  />
+                  <span>💵 Confirmer le règlement du séjour ({checkInReservation.prixTotal} MAD)</span>
+                </label>
+                {checkInForm.paiementEffectueSurPlace && (
+                  <div style={{ marginTop: "10px", display: "flex", gap: "12px", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.8rem", color: "#15803d", fontWeight: 700 }}>Mode d'encaissement :</span>
+                    {["ESPECES", "CARTE_BANCAIRE", "VIREMENT"].map((m) => (
+                      <label key={m} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.82rem", color: "#166534", fontWeight: 600, cursor: "pointer" }}>
+                        <input
+                          type="radio"
+                          name="modePaiementCheckIn"
+                          value={m}
+                          checked={checkInForm.methodePaiementSurPlace === m}
+                          onChange={(e) => setCheckInForm({ ...checkInForm, methodePaiementSurPlace: e.target.value })}
+                          style={{ accentColor: "#16a34a" }}
+                        />
+                        {m === "ESPECES" ? "Espèces" : m === "CARTE_BANCAIRE" ? "Carte TPE" : "Virement"}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Remarques & Besoins spécifiques */}
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
+                  Remarques / Demandes d'accueil (ex: Clés remises, Lit bébé, Petit-déjeuner)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Notes internes pour le séjour du client..."
+                  value={checkInForm.remarques}
+                  onChange={(e) => setCheckInForm({ ...checkInForm, remarques: e.target.value })}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.86rem", resize: "vertical" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                <button
+                  type="button"
+                  disabled={isSubmittingCheckIn}
+                  onClick={() => setCheckInReservation(null)}
+                  style={{ padding: "12px 20px", borderRadius: "12px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCheckIn}
+                  style={{
+                    padding: "12px 26px",
+                    borderRadius: "12px",
+                    border: "none",
+                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    fontSize: "0.95rem",
+                    cursor: isSubmittingCheckIn ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 15px rgba(16, 185, 129, 0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                >
+                  {isSubmittingCheckIn ? "⏳ Validation en cours..." : "✨ Confirmer & Valider le Check-in"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE FICHE CHECK-IN / FICHE DE POLICE (IMPRIMABLE) ─────────────── */}
+      {viewingCheckInVoucher && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15, 23, 42, 0.7)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1250, padding: "20px" }}>
+          <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", maxWidth: "750px", width: "100%", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.3)", border: "1px solid #e2e8f0" }}>
+            
+            {/* Action Bar */}
+            <div style={{ padding: "16px 28px", backgroundColor: "#0f172a", color: "#ffffff", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "20px 20px 0 0" }}>
+              <div style={{ fontWeight: 800, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "10px" }}>
+                <span>📋</span> Fiche d'Enregistrement Client (Check-in Validé)
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    backgroundColor: "var(--terracotta, #d96b43)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    fontWeight: 800,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  🖨️ Imprimer la Fiche
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingCheckInVoucher(null)}
+                  style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "#ffffff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+
+            {/* Document Imprimable Officiel */}
+            <div id="printable-checkin-sheet" style={{ padding: "36px 40px", color: "#0f172a", fontFamily: "'Outfit', sans-serif" }}>
+              {/* En-tête Riad */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #e2e8f0", paddingBottom: "20px", marginBottom: "24px" }}>
+                <div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "var(--terracotta, #d96b43)" }}>
+                    🏰 {viewingCheckInVoucher.riad?.nom || selectedRiad?.nom || "Riad Authentique"}
+                  </div>
+                  <div style={{ fontSize: "0.85rem", color: "#475569", marginTop: "4px" }}>
+                    📍 {viewingCheckInVoucher.riad?.adresse || selectedRiad?.adresse || "Médina"}, {viewingCheckInVoucher.riad?.ville || selectedRiad?.ville || "Maroc"}
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>
+                    Plateforme Officielle MoroccoRiads • Hospitality Management
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase", fontWeight: 800 }}>Fiche N°</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a" }}>CHK-{viewingCheckInVoucher.id.substring(0, 8).toUpperCase()}</div>
+                  <div style={{ fontSize: "0.78rem", color: "#16a34a", fontWeight: 800, marginTop: "4px", backgroundColor: "#dcfce7", padding: "3px 8px", borderRadius: "6px", display: "inline-block" }}>
+                    ✓ CHECK-IN CONFIRMÉ
+                  </div>
+                </div>
+              </div>
+
+              {/* Titre Document */}
+              <div style={{ textAlign: "center", marginBottom: "28px" }}>
+                <h2 style={{ fontSize: "1.2rem", fontWeight: 900, textTransform: "uppercase", letterSpacing: "1px", color: "#0f172a", margin: 0 }}>
+                  Fiche Individuelle de Séjour & d'Accueil
+                </h2>
+                <p style={{ fontSize: "0.8rem", color: "#64748b", margin: "4px 0 0 0" }}>
+                  Enregistrement officiel de l'hôte à l'arrivée (Hospitalité Marocaine)
+                </p>
+              </div>
+
+              {/* Tableau Données Client */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+                <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px" }}>
+                    👤 Renseignements du Client
+                  </div>
+                  <div style={{ fontSize: "0.84rem", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div><strong>Nom & Prénom :</strong> {viewingCheckInVoucher.clientPrenom || viewingCheckInVoucher.client?.prenom || ""} {viewingCheckInVoucher.clientNom || viewingCheckInVoucher.client?.nom || "Client"}</div>
+                    <div><strong>Document d'Identité :</strong> {viewingCheckInVoucher.clientTypePieceIdentite || "CIN"} N° <strong>{viewingCheckInVoucher.clientNumeroPieceIdentite || "Non spécifié"}</strong></div>
+                    <div><strong>Nationalité :</strong> {viewingCheckInVoucher.clientNationalite || "Marocaine"}</div>
+                    <div><strong>Date de Naissance :</strong> {viewingCheckInVoucher.clientDateNaissance || "N/A"}</div>
+                    <div><strong>Téléphone :</strong> {viewingCheckInVoucher.clientTelephone || viewingCheckInVoucher.client?.telephone || "N/A"}</div>
+                    <div><strong>Email :</strong> {viewingCheckInVoucher.clientEmail || viewingCheckInVoucher.client?.email || "N/A"}</div>
+                  </div>
+                </div>
+
+                <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px" }}>
+                    🏨 Détails du Séjour
+                  </div>
+                  <div style={{ fontSize: "0.84rem", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div><strong>Date d'Arrivée :</strong> {viewingCheckInVoucher.dateDebut}</div>
+                    <div><strong>Date de Départ :</strong> {viewingCheckInVoucher.dateFin}</div>
+                    <div><strong>Chambre(s) Assignée(s) :</strong> {viewingCheckInVoucher.riadEntier ? "Location Riad Entier" : (viewingCheckInVoucher.chambres && viewingCheckInVoucher.chambres.length > 0 ? viewingCheckInVoucher.chambres.map(c => c.nomChambre).join(", ") : "Chambre")}</div>
+                    <div><strong>Nombre d'occupants :</strong> {viewingCheckInVoucher.nombrePersonnes || 1} personne(s)</div>
+                    <div><strong>Montant Total :</strong> {viewingCheckInVoucher.prixTotal} MAD</div>
+                    <div><strong>Règlement :</strong> {viewingCheckInVoucher.methodePaiementCheckIn ? `Encaissé sur place (${viewingCheckInVoucher.methodePaiementCheckIn})` : "Confirmé / En ligne"}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarques */}
+              {viewingCheckInVoucher.remarquesCheckIn && (
+                <div style={{ backgroundColor: "#fffbeb", padding: "14px", borderRadius: "10px", border: "1px solid #fde68a", marginBottom: "24px", fontSize: "0.84rem" }}>
+                  <strong>Notes & Remarques d'accueil :</strong> {viewingCheckInVoucher.remarquesCheckIn}
+                </div>
+              )}
+
+              {/* Signatures */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "40px", marginTop: "40px", paddingTop: "20px", borderTop: "1px dashed #cbd5e1" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 700, marginBottom: "48px" }}>
+                    Signature du Voyageur / Hôte
+                  </div>
+                  <div style={{ borderTop: "1px solid #94a3b8", width: "80%", margin: "0 auto", fontSize: "0.75rem", color: "#94a3b8", paddingTop: "4px" }}>
+                    Lu et approuvé
+                  </div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 700, marginBottom: "48px" }}>
+                    Cachet & Signature de l'Établissement
+                  </div>
+                  <div style={{ borderTop: "1px solid #94a3b8", width: "80%", margin: "0 auto", fontSize: "0.75rem", color: "#94a3b8", paddingTop: "4px" }}>
+                    {viewingCheckInVoucher.riad?.nom || selectedRiad?.nom || "Direction du Riad"}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

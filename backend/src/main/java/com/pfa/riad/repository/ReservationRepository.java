@@ -13,9 +13,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     // Trouver toutes les réservations d'un client spécifique (triées par date de création récente)
     List<Reservation> findByClientIdOrderByDateCreationDesc(UUID clientId);
 
+    // Trouver toutes les réservations d'un client par son email (invité ou connecté)
+    List<Reservation> findByClientEmailIgnoreCaseOrderByDateCreationDesc(String email);
+
     // Trouver toutes les réservations pour les Riads appartenant à un hébergeur/propriétaire
     List<Reservation> findByRiadProprietaireIdOrderByDateCreationDesc(UUID ownerId);
 
     // Trouver toutes les réservations d'un Riad
     List<Reservation> findByRiadIdOrderByDateCreationDesc(UUID riadId);
 }
+

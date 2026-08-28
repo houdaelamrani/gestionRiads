@@ -3,6 +3,7 @@ package com.pfa.riad.service;
 import com.pfa.riad.dto.ChambreRequest;
 import com.pfa.riad.entity.Chambre;
 import com.pfa.riad.entity.Riad;
+import com.pfa.riad.enums.StatutChambre;
 import com.pfa.riad.enums.StatutUtilisateur;
 import com.pfa.riad.repository.ChambreRepository;
 import com.pfa.riad.repository.RiadRepository;
@@ -45,7 +46,8 @@ public class ChambreServiceImpl implements ChambreService {
                 .description(request.getDescription())
                 .prixParNuit(request.getPrixParNuit())
                 .capacite(request.getCapacite())
-                .disponible(true) // Disponible par défaut
+                .disponible(true)
+                .statut(StatutChambre.DISPONIBLE)
                 .build();
 
         // 5. Sauvegarder
@@ -65,23 +67,20 @@ public class ChambreServiceImpl implements ChambreService {
         return chambreRepository.findByRiadId(riadId);
     }
 
-
     @Override
     public Chambre modifierDisponibilite(UUID chambreId, Boolean disponible, UUID proprietaireId) {
-        // 1. Récupérer la chambre
         Chambre chambre = chambreRepository.findById(chambreId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
 
-        // 2. Vérifier la propriété
         Riad riad = chambre.getRiad();
         if (!riad.getProprietaire().getId().equals(proprietaireId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
         }
 
-        // 3. Modifier la disponibilité
         chambre.setDisponible(disponible);
-
-        // 4. Sauvegarder
+        if (Boolean.TRUE.equals(disponible) && chambre.getStatut() == null) {
+            chambre.setStatut(StatutChambre.DISPONIBLE);
+        }
         return chambreRepository.save(chambre);
     }
 
@@ -104,6 +103,18 @@ public class ChambreServiceImpl implements ChambreService {
         }
         if (prixParNuit != null) chambre.setPrixParNuit(prixParNuit);
         if (capacite != null) chambre.setCapacite(capacite);
+        return chambreRepository.save(chambre);
+    }
+
+    @Override
+    public Chambre modifierStatutChambre(UUID chambreId, StatutChambre statut, UUID proprietaireId) {
+        Chambre chambre = chambreRepository.findById(chambreId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chambre non trouvée."));
+        if (!chambre.getRiad().getProprietaire().getId().equals(proprietaireId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé. Ce Riad ne vous appartient pas.");
+        }
+        chambre.setStatut(statut);
+        chambre.setDisponible(statut == StatutChambre.DISPONIBLE);
         return chambreRepository.save(chambre);
     }
 

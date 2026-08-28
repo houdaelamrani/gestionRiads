@@ -96,4 +96,92 @@ public class NotificationService {
             logger.warn("[MAIL RÉEL RAPPEL] Non envoyé car JavaMailSender n'est pas configuré.");
         }
     }
+
+    public void envoyerNotificationPaiementSurPlace(String nomClient, String emailClient, String telephoneClient, String nomRiad, String dates, String dateDebut) {
+        String smsMessage = String.format(
+                "SMS pour %s (%s) : Réservation enregistrée pour %s (%s). IMPORTANT : Pour confirmer votre séjour, veuillez verser une avance ou venir avant le jour J (%s). À défaut, elle sera annulée le jour J. - MoroccoRiads",
+                nomClient, telephoneClient != null ? telephoneClient : "N/A", nomRiad, dates, dateDebut
+        );
+        logger.info("[SIMULATION SMS SUR PLACE] {}", smsMessage);
+        System.out.println("[SMS SENT SUR PLACE] " + smsMessage);
+
+        String emailBody = String.format(
+                "Bonjour %s,\n\n" +
+                "Votre demande de réservation pour le Riad : %s (Dates : %s) a bien été enregistrée avec l'option « Paiement sur place ».\n\n" +
+                "⚠️ INFORMATION IMPORTANTE POUR CONFIRMER VOTRE SÉJOUR :\n" +
+                "Pour valider définitivement votre réservation, vous êtes prié(e) de verser une avance (acompte) ou de vous présenter à l'établissement avant le jour de votre arrivée (jour J : %s).\n" +
+                "À défaut de versement de cette avance avant le jour J, votre réservation sera automatiquement annulée le jour même.\n\n" +
+                "Nous restons à votre entière disposition pour tout renseignement complémentaire.\n\n" +
+                "Cordialement,\n" +
+                "L'équipe MoroccoRiads",
+                nomClient, nomRiad, dates, dateDebut
+        );
+        logger.info("[SIMULATION EMAIL SUR PLACE] Destinataire: {}\nSujet: Confirmation requise (Avance) - MoroccoRiads\nCorps:\n{}", emailClient, emailBody);
+        System.out.println("[EMAIL SENT SUR PLACE] To: " + emailClient + "\n" + emailBody);
+
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                if (mailFrom != null && !mailFrom.trim().isEmpty()) {
+                    message.setFrom("MoroccoRiads <" + mailFrom + ">");
+                    message.setBcc(mailFrom);
+                } else {
+                    message.setFrom("booking@moroccoriads.com");
+                }
+                message.setTo(emailClient);
+                message.setSubject("Confirmation requise (Avance) - MoroccoRiads");
+                message.setText(emailBody);
+                mailSender.send(message);
+                logger.info("[MAIL RÉEL SUR PLACE] Envoyé avec succès à {}", emailClient);
+            } catch (Exception e) {
+                logger.error("[MAIL RÉEL SUR PLACE] Échec de l'envoi du mail réel à {} : {}", emailClient, e.getMessage());
+            }
+        }
+    }
+
+    public void envoyerConfirmationCheckIn(String nomClient, String emailClient, String telephoneClient, String nomRiad, String dates, String typePiece, String numeroPiece, String chambres) {
+        String smsMessage = String.format(
+                "SMS pour %s (%s) : Bienvenue au %s ! Votre Check-in a été validé avec succès (Pièce: %s %s). Chambre(s) : %s. Bon séjour ! - MoroccoRiads",
+                nomClient, telephoneClient != null ? telephoneClient : "N/A", nomRiad, typePiece, numeroPiece, chambres != null ? chambres : "Assignée"
+        );
+        logger.info("[SIMULATION SMS CHECK-IN] {}", smsMessage);
+        System.out.println("[SMS SENT CHECK-IN] " + smsMessage);
+
+        String emailBody = String.format(
+                "Bonjour %s,\n\n" +
+                "Nous avons le plaisir de vous confirmer que votre enregistrement d'arrivée (Check-in) au « %s » a été validé avec succès !\n\n" +
+                "📋 DÉTAILS DE VOTRE ENREGISTREMENT :\n" +
+                "- Établissement : %s\n" +
+                "- Dates du séjour : %s\n" +
+                "- Hébergement : %s\n" +
+                "- Document d'identité enregistré : %s n° %s\n" +
+                "- Statut du séjour : En cours (Check-in validé)\n\n" +
+                "Toute l'équipe du Riad vous souhaite un agréable et inoubliable séjour parmi nous.\n\n" +
+                "Chaleureusement,\n" +
+                "L'équipe %s & MoroccoRiads",
+                nomClient, nomRiad, nomRiad, dates, chambres != null ? chambres : "Chambre(s) réservée(s)",
+                typePiece != null ? typePiece : "Pièce d'identité", numeroPiece != null ? numeroPiece : "-", nomRiad
+        );
+        logger.info("[SIMULATION EMAIL CHECK-IN] Destinataire: {}\nSujet: Bienvenue ! Check-in validé au {}\nCorps:\n{}", emailClient, nomRiad, emailBody);
+        System.out.println("[EMAIL SENT CHECK-IN] To: " + emailClient + "\n" + emailBody);
+
+        if (mailSender != null && emailClient != null && !emailClient.isBlank()) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                if (mailFrom != null && !mailFrom.trim().isEmpty()) {
+                    message.setFrom(nomRiad + " <" + mailFrom + ">");
+                    message.setBcc(mailFrom);
+                } else {
+                    message.setFrom("welcome@moroccoriads.com");
+                }
+                message.setTo(emailClient);
+                message.setSubject("✨ Bienvenue ! Check-in validé au " + nomRiad + " - MoroccoRiads");
+                message.setText(emailBody);
+                mailSender.send(message);
+                logger.info("[MAIL RÉEL CHECK-IN] Envoyé avec succès à {}", emailClient);
+            } catch (Exception e) {
+                logger.error("[MAIL RÉEL CHECK-IN] Échec de l'envoi du mail réel à {} : {}", emailClient, e.getMessage());
+            }
+        }
+    }
 }

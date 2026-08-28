@@ -32,4 +32,10 @@ public class ReservationRequest {
     // Méthode de paiement (ex: CARTE_BANCAIRE, PAYPAL, SUR_PLACE)
     @NotNull(message = "La méthode de paiement est obligatoire")
     private String methodePaiement;
+
+    // Coordonnées client invité (si non connecté)
+    private String nom;
+    private String prenom;
+    private String telephone;
+    private String email;
 }

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "../../lib/LanguageContext";
+import LogoIcon from "../../components/LogoIcon";
 
 function ProprietaireLayoutInner({ children }) {
   const router = useRouter();
@@ -28,9 +29,9 @@ function ProprietaireLayoutInner({ children }) {
       const u = JSON.parse(storedUser);
       if (u.role !== "PROPRIETAIRE" && u.role !== "ADMIN") {
         router.push("/login");
-        return;
+      } else {
+        setUser(u);
       }
-      setUser(u);
     } catch (e) {
       router.push("/login");
     }
@@ -46,7 +47,9 @@ function ProprietaireLayoutInner({ children }) {
   if (!user) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a", color: "#ffffff", fontFamily: "'Outfit', sans-serif", padding: "20px", textAlign: "center" }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>🏰</div>
+        <div style={{ marginBottom: "16px" }}>
+          <LogoIcon size={56} />
+        </div>
         <div style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "8px" }}>Espace Propriétaire - MoroccoRiads</div>
         <p style={{ fontSize: "0.95rem", color: "#94a3b8", maxWidth: "420px", marginBottom: "24px" }}>
           Vous n'êtes pas encore connecté. Veuillez vous connecter pour accéder à votre tableau de bord.
@@ -105,9 +108,10 @@ function ProprietaireLayoutInner({ children }) {
       >
         <div>
           {/* Header Sidebar & Brand Logo (Seulement MoroccoRiads) */}
-          <div style={{ padding: "28px 24px 22px 24px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            <Link href="/" title="MoroccoRiads" style={{ textDecoration: "none" }}>
-              <div style={{ fontSize: "1.65rem", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.5px" }}>
+          <div style={{ padding: "24px 20px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <Link href="/" title="MoroccoRiads" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none" }}>
+              <LogoIcon size={38} />
+              <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.5px" }}>
                 Morocco<span style={{ color: "var(--terracotta, #d96b43)" }}>Riads</span>
               </div>
             </Link>
@@ -265,6 +269,39 @@ function ProprietaireLayoutInner({ children }) {
                     <path d="M6 8v9" />
                   </svg>
                   Gestion des Chambres
+                </Link>
+              </li>
+
+              <li>
+                <Link
+                  href="/proprietaire/dashboard?tab=planning"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    padding: "12px 16px",
+                    borderRadius: "12px",
+                    fontSize: "0.88rem",
+                    fontWeight: currentTab === "planning" ? 800 : 600,
+                    color: currentTab === "planning" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
+                    backgroundColor: currentTab === "planning" ? "rgba(217, 107, 67, 0.18)" : "transparent",
+                    borderLeft: currentTab === "planning" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
+                    textDecoration: "none",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "planning" ? 1 : 0.7 }}>
+                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                    <line x1="16" x2="16" y1="2" y2="6" />
+                    <line x1="8" x2="8" y1="2" y2="6" />
+                    <line x1="3" x2="21" y1="10" y2="10" />
+                    <path d="M8 14h.01" />
+                    <path d="M12 14h.01" />
+                    <path d="M16 14h.01" />
+                    <path d="M8 18h.01" />
+                    <path d="M12 18h.01" />
+                  </svg>
+                  Planning & Calendrier
                 </Link>
               </li>
 

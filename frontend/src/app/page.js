@@ -5,6 +5,8 @@ import Link from "next/link";
 import { mapPhotoUrl, API_BASE } from "../lib/api.js";
 import { useLanguage } from "../lib/LanguageContext";
 import { getNotifications, markNotificationsAsRead, getUnreadCount } from "../lib/NotificationSystem";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
@@ -21,6 +23,7 @@ export default function Home() {
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
+  const [planningMap, setPlanningMap] = useState({}); // { riadId: [planningDates] }
 
   // États pour navigation et notifications
   const [activeNavTab, setActiveNavTab] = useState("riads");
@@ -50,7 +53,31 @@ export default function Home() {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        setRiads(data);
+
+        // Charger les chambres et planning de chaque riad
+        const riadsWithChambres = await Promise.all(
+          data.map(async (riad) => {
+            let chambres = [];
+            try {
+              const chRes = await fetch(`${API_BASE}/api/riads/${riad.id}/chambres`);
+              if (chRes.ok) {
+                chambres = await chRes.json();
+              }
+            } catch (e) { /* silencieux */ }
+
+            try {
+              const planRes = await fetch(`${API_BASE}/api/riads/${riad.id}/planning-dates`);
+              if (planRes.ok) {
+                const planData = await planRes.json();
+                setPlanningMap((prev) => ({ ...prev, [riad.id]: planData }));
+              }
+            } catch (e) { /* silencieux */ }
+
+            return { ...riad, chambres };
+          })
+        );
+
+        setRiads(riadsWithChambres);
 
         // Extraire les villes uniques uniquement s'il s'agit du chargement initial "Tous"
         if (ville === "Tous") {
@@ -99,8 +126,19 @@ export default function Home() {
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
-      const user = JSON.parse(userStr);
-      setCurrentUser(user);
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === "PROPRIETAIRE" || user.role === "ADMIN") {
+          setCurrentUser(user);
+        } else {
+          // Les clients n'ont pas besoin de compte
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+          setCurrentUser(null);
+        }
+      } catch (e) {
+        setCurrentUser(null);
+      }
     }
     fetchRiads();
   }, []);
@@ -110,11 +148,31 @@ export default function Home() {
     fetchRiads(ville);
   };
 
+  const handleResetFilters = () => {
+    setSelectedCity("Tous");
+    setCheckIn("");
+    setCheckOut("");
+    setGuests("");
+    setMaxBudget("");
+    fetchRiads("Tous");
+  };
+
+  const handleSearchClick = (e) => {
+    if (e) e.preventDefault();
+    const el = document.getElementById("riads");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const hasActiveFilters = Boolean(
+    (selectedCity && selectedCity !== "Tous") || checkIn || checkOut || guests || maxBudget
+  );
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     setCurrentUser(null);
-    window.location.href = "/login";
   };
 
   const renderStars = (note) => {
@@ -122,267 +180,68 @@ export default function Home() {
     return "★".repeat(n) + "☆".repeat(5 - n);
   };
 
-  // Filtrage avancé côté client
+  // Filtrage avancé côté client (Ville, Dates, Pax, Budget)
   const filteredRiadsList = riads.filter((riad) => {
-    // Filtrer par budget maximum
-    if (maxBudget) {
-      const limit = parseFloat(maxBudget);
-      const minPrice = riad.chambres?.length > 0
-        ? Math.min(...riad.chambres.map((c) => c.prixParNuit))
-        : riad.prixRiadEntier;
-      if (minPrice > limit) return false;
+    // 1. Filtrer par ville si spécifique
+    if (selectedCity && selectedCity !== "Tous" && riad.ville) {
+      if (riad.ville.toLowerCase() !== selectedCity.toLowerCase()) return false;
     }
-    // Filtrer par nombre de voyageurs (capacité de chambre)
-    if (guests) {
-      const numGuests = parseInt(guests);
-      if (riad.chambres?.length > 0) {
-        const hasCapacity = riad.chambres.some((c) => c.capacite >= numGuests);
-        if (!hasCapacity) return false;
-      } else if (riad.capaciteMaximale && riad.capaciteMaximale < numGuests) {
+
+    let matchingChambres = riad.chambres?.filter((c) => c.disponible !== false) || [];
+
+    // 2. Filtrer par budget maximum (prix <= maxBudget)
+    if (maxBudget && !isNaN(parseFloat(maxBudget))) {
+      const limit = parseFloat(maxBudget);
+      matchingChambres = matchingChambres.filter((c) => {
+        const p = parseFloat(c.prixParNuit);
+        return !isNaN(p) && p <= limit;
+      });
+      const riadEntierPrice = riad.prixRiadEntier ? parseFloat(riad.prixRiadEntier) : Infinity;
+      if (matchingChambres.length === 0 && riadEntierPrice > limit) {
         return false;
       }
     }
+
+    // 3. Filtrer par nombre de voyageurs (capacite >= guests)
+    if (guests && !isNaN(parseInt(guests, 10))) {
+      const numGuests = parseInt(guests, 10);
+      matchingChambres = matchingChambres.filter((c) => {
+        const cap = parseInt(c.capacite, 10);
+        return !isNaN(cap) && cap >= numGuests;
+      });
+      const riadMaxCap = riad.capaciteMaximale ? parseInt(riad.capaciteMaximale, 10) : (riad.chambres?.reduce((acc, c) => acc + (parseInt(c.capacite, 10) || 0), 0) || 0);
+      if (matchingChambres.length === 0 && riadMaxCap < numGuests) {
+        return false;
+      }
+    }
+
+    // 4. Filtrer par dates de séjour (Arrivée & Départ)
+    if (checkIn && checkOut && checkIn < checkOut) {
+      const plans = planningMap[riad.id] || [];
+      const riadEntierOccupe = plans.some(
+        (p) => p.riadEntier && !(checkOut <= p.dateDebut || checkIn >= p.dateFin)
+      );
+      if (riadEntierOccupe) return false;
+
+      matchingChambres = matchingChambres.filter((ch) => {
+        const chOccupee = plans.some(
+          (p) => p.chambreId === ch.id && !(checkOut <= p.dateDebut || checkIn >= p.dateFin)
+        );
+        return !chOccupee;
+      });
+
+      if (riad.chambres?.length > 0 && matchingChambres.length === 0) {
+        return false;
+      }
+    }
+
     return true;
   });
 
   return (
     <div>
       {/* 1. Navbar */}
-      <nav className="navbar">
-        <a href="#" className="nav-logo">
-          Morocco<span>Riads</span>
-        </a>
-        <ul className="nav-links">
-          <li>
-            <a
-              href="#riads"
-              className={`nav-item ${activeNavTab === "riads" ? "active" : ""}`}
-              onClick={() => setActiveNavTab("riads")}
-            >
-              {t("nav_riads")}
-            </a>
-          </li>
-          <li>
-            <a
-              href="#comment"
-              className={`nav-item ${activeNavTab === "services" ? "active" : ""}`}
-              onClick={() => setActiveNavTab("services")}
-            >
-              {t("nav_services")}
-            </a>
-          </li>
-        </ul>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          
-          {/* Cloche de notifications (Affichée uniquement si le client est connecté/inscrit) */}
-          {currentUser && (
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => {
-                  setShowNotifications(!showNotifications);
-                  if (!showNotifications) markNotificationsAsRead();
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "1.2rem",
-                  cursor: "pointer",
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  color: "var(--text-secondary)"
-                }}
-              >
-                🔔
-                {unreadCount > 0 && (
-                  <span style={{
-                    position: "absolute",
-                    top: "-4px",
-                    right: "-4px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
-                    width: "16px",
-                    height: "16px",
-                    fontSize: "0.65rem",
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                  }}>
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <div style={{
-                  position: "absolute",
-                  top: "35px",
-                  right: "0",
-                  width: "290px",
-                  backgroundColor: "#ffffff",
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-                  border: "1px solid var(--border)",
-                  zIndex: 1000,
-                  maxHeight: "320px",
-                  overflowY: "auto",
-                  padding: "10px 0"
-                }}>
-                  <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: "0.85rem", color: "var(--text-primary)" }}>
-                    {language === "en" ? "Notifications" : "Notifications"}
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: "20px 16px", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.82rem" }}>
-                      {language === "en" ? "No new notifications" : "Aucune notification"}
-                    </div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div key={n.id} style={{
-                        padding: "12px 16px",
-                        borderBottom: "1px solid var(--gray-light)",
-                        fontSize: "0.8rem",
-                        lineHeight: "1.4",
-                        backgroundColor: n.read ? "transparent" : "#f0f9ff",
-                        color: "var(--text-primary)"
-                      }}>
-                        {n.message}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Lang Selector */}
-          <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: "20px", padding: "2px", backgroundColor: "var(--bg-secondary)" }}>
-            <button
-              onClick={() => setLanguage("fr")}
-              style={{
-                background: language === "fr" ? "var(--terracotta)" : "transparent",
-                color: language === "fr" ? "#fff" : "var(--text-secondary)",
-                border: "none",
-                borderRadius: "18px",
-                padding: "4px 10px",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              FR
-            </button>
-            <button
-              onClick={() => setLanguage("en")}
-              style={{
-                background: language === "en" ? "var(--terracotta)" : "transparent",
-                color: language === "en" ? "#fff" : "var(--text-secondary)",
-                border: "none",
-                borderRadius: "18px",
-                padding: "4px 10px",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              EN
-            </button>
-          </div>
-
-          {currentUser ? (
-            <>
-              <span
-                style={{
-                  fontSize: "0.95rem",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                {t("hello")}{" "}
-                <strong style={{ color: "var(--terracotta)" }}>
-                  {currentUser.prenom}
-                </strong>
-              </span>
-              {currentUser.role === "CLIENT" && (
-                <Link
-                  href="/client/catalogue"
-                  className="btn btn-secondary"
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: "0.85rem",
-                    border: "1px solid var(--terracotta)",
-                    color: "var(--terracotta)",
-                    fontWeight: 700
-                  }}
-                >
-                  🏡 Mon Espace Client
-                </Link>
-              )}
-              {currentUser.role === "PROPRIETAIRE" && (
-                <Link
-                  href="/proprietaire/dashboard"
-                  className="btn btn-secondary"
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: "0.85rem",
-                    border: "1px solid var(--terracotta)",
-                    color: "var(--terracotta)",
-                    fontWeight: 700
-                  }}
-                >
-                  🏰 Mon Espace Gérant
-                </Link>
-              )}
-              {currentUser.role === "ADMIN" && (
-                <Link
-                  href="/proprietaire/dashboard"
-                  className="btn btn-secondary"
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: "0.85rem",
-                    border: "1px solid #6366f1",
-                    color: "#6366f1",
-                    fontWeight: 700
-                  }}
-                >
-                  👨‍💼 Espace Administrateur
-                </Link>
-              )}
-              <button
-                onClick={handleLogout}
-                className="btn btn-secondary"
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "0.85rem",
-                  border: "1px solid var(--text-secondary)",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                {t("logout")}
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className="btn btn-secondary"
-                style={{ padding: "8px 18px", fontSize: "0.85rem", fontWeight: 700 }}
-              >
-                {t("login")}
-              </Link>
-              <Link
-                href="/register"
-                className="btn btn-primary"
-                style={{ padding: "8px 20px", fontSize: "0.85rem", fontWeight: 700 }}
-              >
-                {t("register")}
-              </Link>
-            </>
-          )}
-        </div>
-      </nav>
+      <Navbar activeTab={activeNavTab} />
 
       {/* 2. Hero Section */}
       <header className="hero">
@@ -498,17 +357,17 @@ export default function Home() {
 
           <div style={{ width: "1px", height: "30px", backgroundColor: "var(--border)" }} />
 
-          {/* Voyageurs */}
+          {/* Nombre de Pax */}
           <div style={{ flex: 0.8, minWidth: "90px", display: "flex", flexDirection: "column", textAlign: "left" }}>
             <label style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.5px" }}>
-              {language === "en" ? "Guests" : "Voyageurs"}
+              {language === "en" ? "Pax" : "Pax"}
             </label>
             <input
               type="number"
               value={guests}
               min="1"
               max="20"
-              placeholder="1"
+              placeholder="1 Pax"
               onChange={(e) => setGuests(e.target.value)}
               style={{
                 border: "none",
@@ -548,8 +407,9 @@ export default function Home() {
             />
           </div>
           
-          <a
-            href="#riads"
+          <button
+            type="button"
+            onClick={handleSearchClick}
             style={{
               width: "48px",
               height: "48px",
@@ -563,27 +423,90 @@ export default function Home() {
               transition: "transform 0.15s",
               fontSize: "1.1rem",
               border: "none",
-              textDecoration: "none"
+              textDecoration: "none",
+              flexShrink: 0
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
             onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
             title={t("search_title")}
           >
             🔍
-          </a>
+          </button>
         </div>
       </section>
 
       {/* 4. Contenu Principal */}
       <main className="main-container">
         {/* Section Riads Disponibles */}
-        <section id="riads" style={{ padding: "60px 0" }}>
-          <div className="section-header">
+        <section id="riads" style={{ padding: "40px 0 60px 0" }}>
+          <div className="section-header" style={{ marginBottom: "24px" }}>
             <h2>{t("riads_title")}</h2>
             <p>
               {t("riads_desc")}
             </p>
           </div>
+
+          {/* Barre d'état des filtres actifs */}
+          {hasActiveFilters && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "12px",
+              backgroundColor: "#fff",
+              padding: "14px 20px",
+              borderRadius: "14px",
+              border: "1px solid var(--border)",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+              marginBottom: "28px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", fontSize: "0.88rem", color: "var(--text-primary)" }}>
+                <span style={{ fontWeight: 700, color: "var(--terracotta)" }}>
+                  ✨ {filteredRiadsList.length} Riad(s) correspondant(s)
+                </span>
+                {selectedCity && selectedCity !== "Tous" && (
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
+                    📍 {selectedCity}
+                  </span>
+                )}
+                {checkIn && checkOut && (
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
+                    📅 {checkIn} ➔ {checkOut}
+                  </span>
+                )}
+                {guests && (
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
+                    👥 {guests} Pax
+                  </span>
+                )}
+                {maxBudget && (
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
+                    💰 Max {maxBudget} MAD
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={handleResetFilters}
+                style={{
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  color: "#ef4444",
+                  border: "none",
+                  padding: "6px 14px",
+                  borderRadius: "8px",
+                  fontSize: "0.82rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                ✕ {language === "en" ? "Reset filters" : "Réinitialiser les filtres"}
+              </button>
+            </div>
+          )}
 
           {loadingRiads ? (
             <div
@@ -601,14 +524,21 @@ export default function Home() {
                 const photos = riadPhotos[riad.id] || [];
                 const avisInfo = riadAvis[riad.id] || { moy: 0, count: 0 };
                 const mainPhoto = photos.length > 0 ? mapPhotoUrl(photos[0].url) : null;
-                const minPrice =
-                  riad.chambres?.length > 0
-                    ? Math.min(
-                        ...riad.chambres.map((c) => c.prixParNuit)
-                      )
-                    : riad.prixRiadEntier;
+                const availableChambres = riad.chambres?.filter((c) => c.disponible !== false) || [];
+                const validPrices = availableChambres
+                  .map((c) => parseFloat(c.prixParNuit))
+                  .filter((p) => !isNaN(p));
+                const minPrice = validPrices.length > 0
+                  ? Math.min(...validPrices)
+                  : (riad.prixRiadEntier ? parseFloat(riad.prixRiadEntier) : null);
 
-                const detailsUrl = currentUser ? `/client/riads/${riad.id}` : "/login";
+                const queryParams = new URLSearchParams();
+                if (checkIn) queryParams.set("checkIn", checkIn);
+                if (checkOut) queryParams.set("checkOut", checkOut);
+                if (guests) queryParams.set("pax", guests);
+                if (maxBudget) queryParams.set("budget", maxBudget);
+                const qStr = queryParams.toString();
+                const detailsUrl = qStr ? `/client/riads/${riad.id}?${qStr}` : `/client/riads/${riad.id}`;
 
                 return (
                   <Link href={detailsUrl} key={riad.id} style={{ textDecoration: "none", color: "inherit" }}>
@@ -808,77 +738,7 @@ export default function Home() {
       </main>
 
       {/* 6. Footer */}
-      <footer className="footer">
-        <div className="footer-grid">
-          <div className="footer-col">
-            <h3 className="footer-logo">
-              Morocco<span>Riads</span>
-            </h3>
-            <p className="footer-desc">
-              {t("footer_desc")}
-            </p>
-          </div>
-          <div className="footer-col">
-            <h4>{t("footer_destinations")}</h4>
-            <ul className="footer-links">
-              <li>
-                <a href="#" onClick={() => handleCityFilter("Marrakech")}>
-                  Marrakech
-                </a>
-              </li>
-              <li>
-                <a href="#" onClick={() => handleCityFilter("Fès")}>
-                  Fès
-                </a>
-              </li>
-              <li>
-                <a href="#" onClick={() => handleCityFilter("Essaouira")}>
-                  Essaouira
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h4>{t("footer_platform")}</h4>
-            <ul className="footer-links">
-              <li>
-                <a href="#riads">{t("nav_riads")}</a>
-              </li>
-              <li>
-                <a href="#comment">{t("nav_services")}</a>
-              </li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h4>{t("footer_newsletter")}</h4>
-            <p style={{ fontSize: "0.9rem", marginBottom: "16px" }}>
-              {t("newsletter_desc")}
-            </p>
-            <form
-              className="newsletter-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                alert(t("newsletter_success"));
-              }}
-            >
-              <input type="email" placeholder={t("newsletter_placeholder")} required />
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ padding: "10px 16px" }}
-              >
-                {t("newsletter_btn")}
-              </button>
-            </form>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <p>
-            {t("footer_rights")}
-          </p>
-          <p>{t("footer_motto")}</p>
-        </div>
-      </footer>
+      <Footer onCityClick={handleCityFilter} />
     </div>
   );
 }
