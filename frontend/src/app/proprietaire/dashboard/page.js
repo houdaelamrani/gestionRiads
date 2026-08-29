@@ -1,13 +1,15 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { API_BASE } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
 import AvailabilityCalendar from "@/components/AvailabilityCalendar";
 
 function ProprietaireDashboardInner() {
   const { t, language } = useLanguage();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams ? searchParams.get("tab") || "dashboard" : "dashboard";
 
@@ -125,6 +127,10 @@ function ProprietaireDashboardInner() {
   const [isSubmittingRoom, setIsSubmittingRoom] = useState(false);
   const [isSavingRiad, setIsSavingRiad] = useState(false);
 
+  // Planning Visuel Hebdomadaire (Dashboard)
+  const [scheduleOffset, setScheduleOffset] = useState(0);
+  const [selectedScheduleReservation, setSelectedScheduleReservation] = useState(null);
+
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -132,10 +138,10 @@ function ProprietaireDashboardInner() {
         const u = JSON.parse(storedUser);
         setUser(u);
         setProfileForm({
-          nom: u.nom || "El Amrani",
-          prenom: u.prenom || "Houda",
-          email: u.email || "elamranihouda540@gmail.com",
-          telephone: u.telephone || "+212 600-000000",
+          nom: u.nom || "",
+          prenom: u.prenom || "",
+          email: u.email || "",
+          telephone: u.telephone || "",
           motDePasse: "",
           confirmPassword: ""
         });
@@ -143,6 +149,13 @@ function ProprietaireDashboardInner() {
       } catch (e) {}
     }
   }, []);
+
+  useEffect(() => {
+    const filterParam = searchParams ? searchParams.get("filter") : null;
+    if (filterParam) {
+      setReservationFilter(filterParam);
+    }
+  }, [searchParams]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -159,24 +172,9 @@ function ProprietaireDashboardInner() {
         dataRiads = await resRiads.json();
       }
 
-      let marrakechPublic = [];
-      const resMke = await fetch(`${API_BASE}/api/riads/recherche?ville=Marrakech`);
-      if (resMke.ok) {
-        marrakechPublic = await resMke.json();
-      }
-
-      const combined = [...dataRiads, ...marrakechPublic];
-      const marrakechOnlyMap = new Map();
-      combined.forEach((r) => {
-        if (r && r.id && (r.ville === "Marrakech" || r.ville === "marrakech")) {
-          marrakechOnlyMap.set(r.id, r);
-        }
-      });
-      const dataRiadsMarrakech = Array.from(marrakechOnlyMap.values());
-
-      if (dataRiadsMarrakech.length > 0) {
+      if (dataRiads && dataRiads.length > 0) {
         const riadsWithPhotos = await Promise.all(
-          dataRiadsMarrakech.map(async (r) => {
+          dataRiads.map(async (r) => {
             try {
               const pRes = await fetch(`${API_BASE}/api/riads/${r.id}/photos`);
               if (pRes.ok) {
@@ -188,35 +186,40 @@ function ProprietaireDashboardInner() {
             } catch (e) {}
             return {
               ...r,
-              photoUrl: r.photoUrl || "https://res.cloudinary.com/mgmnml6e/image/upload/v1783959393/j5jlng36f4zyt1vswgou.jpg"
+              photoUrl:
+                r.photoUrl ||
+                "https://res.cloudinary.com/mgmnml6e/image/upload/v1783959393/j5jlng36f4zyt1vswgou.jpg"
             };
           })
         );
 
         setRiads(riadsWithPhotos);
 
-        if (riadsWithPhotos.length > 0) {
-          const activeId = keepSelectedId && riadsWithPhotos.some((r) => r.id === keepSelectedId)
+        const activeId =
+          keepSelectedId && riadsWithPhotos.some((r) => r.id === keepSelectedId)
             ? keepSelectedId
             : riadsWithPhotos[0].id;
 
-          const activeRiad = riadsWithPhotos.find((r) => r.id === activeId) || riadsWithPhotos[0];
-          setSelectedRiadId(activeRiad.id);
-          setServices({
-            nom: activeRiad.nom || "",
-            adresse: activeRiad.adresse || "",
-            description: activeRiad.description || "",
-            prixRiadEntier: activeRiad.prixRiadEntier || 0,
-            hasSpa: !!activeRiad.hasSpa,
-            hasHammam: !!activeRiad.hasHammam,
-            hasTraiteur: !!activeRiad.hasTraiteur,
-            photoUrl: activeRiad.photoUrl || ""
-          });
-          setEditRiadFile(null);
-          setEditRiadFilePreview("");
-          loadChambres(activeRiad.id, ownerId);
-          loadPlanningDates(activeRiad.id);
-        }
+        const activeRiad =
+          riadsWithPhotos.find((r) => r.id === activeId) || riadsWithPhotos[0];
+        setSelectedRiadId(activeRiad.id);
+        setServices({
+          nom: activeRiad.nom || "",
+          adresse: activeRiad.adresse || "",
+          description: activeRiad.description || "",
+          prixRiadEntier: activeRiad.prixRiadEntier || 0,
+          hasSpa: !!activeRiad.hasSpa,
+          hasHammam: !!activeRiad.hasHammam,
+          hasTraiteur: !!activeRiad.hasTraiteur,
+          photoUrl: activeRiad.photoUrl || ""
+        });
+        setEditRiadFile(null);
+        setEditRiadFilePreview("");
+        loadChambres(activeRiad.id, ownerId);
+        loadPlanningDates(activeRiad.id);
+      } else {
+        setRiads([]);
+        setChambres([]);
       }
 
       const resResa = await fetch(`${API_BASE}/api/reservations/owner`, {
@@ -671,6 +674,58 @@ function ProprietaireDashboardInner() {
     }
   };
 
+  const handleSubmitDirectBooking = async (e) => {
+    e.preventDefault();
+    if (!directBookingForm.riadId) {
+      alert("Veuillez sélectionner un Riad.");
+      return;
+    }
+    if (!directBookingForm.riadEntier && !directBookingForm.chambreId) {
+      alert("Veuillez sélectionner au moins une chambre.");
+      return;
+    }
+    setIsSubmittingDirectBooking(true);
+    try {
+      const payload = {
+        riadId: directBookingForm.riadId,
+        dateDebut: directBookingForm.dateDebut,
+        dateFin: directBookingForm.dateFin,
+        riadEntier: Boolean(directBookingForm.riadEntier),
+        chambreIds: directBookingForm.riadEntier ? [] : [directBookingForm.chambreId],
+        methodePaiement: directBookingForm.methodePaiement || "SUR_PLACE",
+        nom: directBookingForm.nom,
+        prenom: directBookingForm.prenom,
+        telephone: directBookingForm.telephone,
+        email: directBookingForm.email || `${directBookingForm.nom.toLowerCase().replace(/\s+/g, '')}@direct-guest.ma`
+      };
+
+      const res = await fetch(`${API_BASE}/api/reservations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(user ? { "X-User-Id": user.id } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        showToast("✓ Réservation directe enregistrée avec succès !");
+        setShowDirectBookingModal(false);
+        if (user) {
+          loadOwnerData(user.id, directBookingForm.riadId);
+        }
+      } else {
+        const errorText = await res.text();
+        alert("Erreur lors de la réservation directe : " + errorText);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur réseau lors de la réservation directe.");
+    } finally {
+      setIsSubmittingDirectBooking(false);
+    }
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     if (!user) return;
@@ -714,56 +769,30 @@ function ProprietaireDashboardInner() {
     }
   };
 
-  const handleSubmitDirectBooking = async (e) => {
-    e.preventDefault();
-    if (!directBookingForm.riadId) {
-      alert("Veuillez sélectionner un établissement (Riad).");
-      return;
-    }
-    setIsSubmittingDirectBooking(true);
-    try {
-      const payload = {
-        riadId: directBookingForm.riadId,
-        dateDebut: directBookingForm.dateDebut,
-        dateFin: directBookingForm.dateFin,
-        riadEntier: directBookingForm.riadEntier,
-        chambreIds: directBookingForm.riadEntier ? [] : (directBookingForm.chambreId ? [directBookingForm.chambreId] : []),
-        nom: directBookingForm.nom || "Client",
-        prenom: directBookingForm.prenom || "Direct",
-        email: directBookingForm.email || `client.direct.${Date.now()}@riad.ma`,
-        telephone: directBookingForm.telephone || "+212 600-000000",
-        methodePaiement: directBookingForm.methodePaiement
-      };
-
-      const res = await fetch(`${API_BASE}/api/reservations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Erreur lors de la réservation directe.");
-      }
-
-      showToast("✓ Réservation directe enregistrée avec succès !");
-      setShowDirectBookingModal(false);
-      if (user?.id) loadOwnerData(user.id);
-    } catch (err) {
-      alert(err.message || "Erreur lors de la réservation.");
-    } finally {
-      setIsSubmittingDirectBooking(false);
-    }
-  };
-
   const filteredRiads = riads;
   const filteredReservations = reservations;
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const displayedReservations = filteredReservations.filter((r) => {
     if (reservationFilter === "TOUTES") return true;
+    if (reservationFilter === "ARRIVEES") {
+      return (
+        r.statut !== "ANNULEE" &&
+        r.statut !== "REFUSEE" &&
+        (r.dateDebut === todayStr ||
+          (!r.checkInEffectue && r.dateDebut <= todayStr && r.dateFin >= todayStr))
+      );
+    }
     return r.statut === reservationFilter;
   });
   const filteredAlertesNouvelles = alertes.nouvellesReservations || [];
   const filteredAlertesArrivees = alertes.arriveesAujourdhui || [];
+  const filteredAlertesDeparts = filteredReservations.filter((r) => {
+    return (
+      r.statut === "CONFIRMEE" &&
+      (r.dateFin === todayStr || (r.dateFin <= todayStr && r.checkInEffectue))
+    );
+  });
 
   const selectedRiad = riads.find((r) => r.id === selectedRiadId) || riads[0];
 
@@ -774,6 +803,44 @@ function ProprietaireDashboardInner() {
   const confirmedReservationsCount = filteredReservations.filter((r) => r.statut === "CONFIRMEE").length;
   const totalChambresCount = chambres.length > 0 ? chambres.length : (riads.length * 3 || 1);
   const tauxOccupation = Math.min(100, Math.max(0, Math.round((confirmedReservationsCount / Math.max(1, totalChambresCount)) * 100)));
+
+  // Calcul des 7 jours du planning hebdomadaire
+  const getWeekDays = () => {
+    const days = [];
+    const base = new Date();
+    base.setDate(base.getDate() + scheduleOffset);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().split("T")[0];
+      const dayName = d.toLocaleDateString("fr-FR", { weekday: "short" });
+      const dayNumber = d.getDate();
+      const monthName = d.toLocaleDateString("fr-FR", { month: "short" });
+      const isToday = iso === new Date().toISOString().split("T")[0];
+      days.push({
+        iso,
+        dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
+        dayNumber,
+        monthName,
+        isToday,
+        fullFormatted: `${dayNumber} ${monthName}`
+      });
+    }
+    return days;
+  };
+  const weekDays = getWeekDays();
+
+  const getRoomBookingForDay = (chambreId, dayIso) => {
+    return filteredReservations.find((r) => {
+      if (r.statut === "REFUSEE" || r.statut === "ANNULEE") return false;
+      const inRange =
+        (r.dateDebut <= dayIso && dayIso < r.dateFin) ||
+        (r.dateDebut === dayIso && r.dateFin === dayIso);
+      if (!inRange) return false;
+      if (r.riadEntier) return true;
+      return r.chambres && r.chambres.some((c) => c.id === chambreId);
+    });
+  };
 
   return (
     <div>
@@ -799,78 +866,14 @@ function ProprietaireDashboardInner() {
         </div>
       )}
 
-      {/* ── VUE 1: TABLEAU DE BORD & ALERTES (tab=dashboard) ────────────────── */}
+      {/* ── VUE 1: TABLEAU DE BORD EXÉCUTIF (tab=dashboard) ────────────────── */}
       {(activeTab === "dashboard" || !activeTab) && (
         <div>
-          {/* Header & Quick Actions Bar */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
-            <div>
-              <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0, letterSpacing: "-0.3px" }}>
-                Tableau de Bord
-              </h1>
-              <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
-                Vue d'ensemble opérationnelle et indicateurs de performance de vos Riads.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setDirectBookingForm({
-                    riadId: selectedRiad?.id || (riads[0]?.id || ""),
-                    chambreId: chambres[0]?.id || "",
-                    riadEntier: false,
-                    nom: "",
-                    prenom: "",
-                    email: "",
-                    telephone: "",
-                    dateDebut: new Date().toISOString().split("T")[0],
-                    dateFin: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
-                    methodePaiement: "SUR_PLACE"
-                  });
-                  setShowDirectBookingModal(true);
-                }}
-                style={{
-                  backgroundColor: "var(--terracotta, #d96b43)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "10px",
-                  padding: "10px 18px",
-                  fontSize: "0.85rem",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  boxShadow: "0 4px 14px rgba(217, 107, 67, 0.35)",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <span>➕</span> Réservation Directe
-              </button>
-
-              <button
-                type="button"
-                onClick={() => window.print()}
-                style={{
-                  backgroundColor: "#ffffff",
-                  color: "#0f172a",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "10px",
-                  padding: "10px 16px",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-                }}
-              >
-                <span>📥</span> Exporter Rapport (PDF)
-              </button>
-            </div>
+          {/* Header */}
+          <div style={{ marginBottom: "24px" }}>
+            <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0, letterSpacing: "-0.3px" }}>
+              Tableau de Bord
+            </h1>
           </div>
 
           {/* 5 Balanced Executive KPI Cards */}
@@ -950,231 +953,536 @@ function ProprietaireDashboardInner() {
             </div>
           </div>
 
-          {/* Centre d'Alertes & Décisions */}
-          <section style={{ marginBottom: "32px" }}>
-            {filteredAlertesNouvelles.length === 0 ? (
-              /* Encart discret lorsque 0 demande en attente */
-              <div style={{ backgroundColor: "#ffffff", padding: "14px 20px", borderRadius: "14px", border: "1px solid #e2e8f0", borderLeft: "4px solid #10b981", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.86rem", color: "#334155", fontWeight: 700 }}>
-                  <span style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: "#dcfce7", color: "#16a34a", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: 900 }}>✓</span>
-                  Toutes les demandes de réservation sont traitées (0 en attente de décision).
+          {/* 1. PLANNING VISUEL DE LA SEMAINE (Disponibilités en Direct) */}
+          <section
+            style={{
+              backgroundColor: "#ffffff",
+              padding: "26px 28px",
+              borderRadius: "20px",
+              boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)",
+              border: "1px solid #e2e8f0",
+              borderTop: "4px solid var(--terracotta, #d96b43)",
+              marginBottom: "32px"
+            }}
+          >
+            {/* Header du Planning avec Navigation Temporelle */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "22px",
+                flexWrap: "wrap",
+                gap: "14px"
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <h2 style={{ fontSize: "1.2rem", color: "#0f172a", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                      <line x1="16" x2="16" y1="2" y2="6" />
+                      <line x1="8" x2="8" y1="2" y2="6" />
+                      <line x1="3" x2="21" y1="10" y2="10" />
+                    </svg>
+                    Planning des Disponibilités (Semaine)
+                  </h2>
+                  {riads.length > 1 ? (
+                    <select
+                      value={selectedRiadId}
+                      onChange={(e) => {
+                        const targetRiad = riads.find((r) => r.id === e.target.value);
+                        if (targetRiad) handleSelectRiad(targetRiad);
+                      }}
+                      style={{
+                        backgroundColor: "rgba(217, 107, 67, 0.12)",
+                        color: "var(--terracotta, #d96b43)",
+                        fontSize: "0.82rem",
+                        fontWeight: 800,
+                        padding: "6px 12px",
+                        borderRadius: "12px",
+                        border: "1px solid rgba(217, 107, 67, 0.3)",
+                        cursor: "pointer",
+                        outline: "none"
+                      }}
+                    >
+                      {riads.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.nom} ({r.ville})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span
+                      style={{
+                        backgroundColor: "rgba(217, 107, 67, 0.12)",
+                        color: "var(--terracotta, #d96b43)",
+                        fontSize: "0.78rem",
+                        fontWeight: 800,
+                        padding: "4px 10px",
+                        borderRadius: "12px"
+                      }}
+                    >
+                      {selectedRiad?.nom || "Votre Riad"}
+                    </span>
+                  )}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#15803d", backgroundColor: "#f0fdf4", fontWeight: 800, padding: "4px 10px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
-                  À JOUR
-                </span>
+              </div>
+
+              {/* Boutons de Navigation de la Semaine */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setScheduleOffset((prev) => prev - 7)}
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    color: "#334155",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "10px",
+                    padding: "7px 12px",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Précédent
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setScheduleOffset(0)}
+                  style={{
+                    backgroundColor: scheduleOffset === 0 ? "var(--terracotta, #d96b43)" : "#ffffff",
+                    color: scheduleOffset === 0 ? "#ffffff" : "#0f172a",
+                    border: scheduleOffset === 0 ? "none" : "1px solid #cbd5e1",
+                    borderRadius: "10px",
+                    padding: "7px 14px",
+                    fontSize: "0.8rem",
+                    fontWeight: 800,
+                    cursor: "pointer"
+                  }}
+                >
+                  Aujourd'hui
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setScheduleOffset((prev) => prev + 7)}
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    color: "#334155",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "10px",
+                    padding: "7px 12px",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  Suivant
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Matrice des Disponibilités : Chambres x 7 Jours */}
+            {chambres.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: "#64748b" }}>
+                <p style={{ margin: 0, fontWeight: 700 }}>Aucune chambre configurée pour ce Riad.</p>
               </div>
             ) : (
-              /* Encart d'alerte prioritaire lorsqu'il y a des demandes à décider */
-              <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #fee2e2", borderLeft: "5px solid #ef4444", marginBottom: "24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "10px" }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" x2="12" y1="8" y2="12" />
-                      <line x1="12" x2="12.01" y1="16" y2="16" />
-                    </svg>
-                    Demandes de Réservation en Attente
-                  </div>
-                  <span style={{ backgroundColor: "#fee2e2", color: "#991b1b", fontSize: "0.8rem", fontWeight: 800, padding: "6px 14px", borderRadius: "20px" }}>
-                    {filteredAlertesNouvelles.length} demande(s) à décider
-                  </span>
-                </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "6px 8px", fontSize: "0.84rem" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "10px 14px", color: "#64748b", fontWeight: 800, fontSize: "0.78rem", textTransform: "uppercase", width: "190px" }}>
+                        Chambres ({chambres.length})
+                      </th>
+                      {weekDays.map((d, idx) => {
+                        const isToday = d.iso === new Date().toISOString().split("T")[0];
+                        return (
+                          <th
+                            key={idx}
+                            style={{
+                              textAlign: "center",
+                              padding: "8px 6px",
+                              backgroundColor: isToday ? "rgba(217, 107, 67, 0.12)" : "#f8fafc",
+                              borderRadius: "10px",
+                              border: isToday ? "1.5px solid var(--terracotta, #d96b43)" : "1px solid #e2e8f0"
+                            }}
+                          >
+                            <div style={{ fontSize: "0.72rem", color: isToday ? "var(--terracotta, #d96b43)" : "#64748b", fontWeight: 800, textTransform: "uppercase" }}>
+                              {d.dayName}
+                            </div>
+                            <div style={{ fontSize: "0.95rem", fontWeight: 800, color: isToday ? "var(--terracotta, #d96b43)" : "#0f172a" }}>
+                              {d.dayNum}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chambres.map((c) => (
+                      <tr key={c.id}>
+                        {/* Colonne Chambre */}
+                        <td style={{ padding: "8px 12px", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.86rem" }}>{c.nomChambre}</div>
+                          <div style={{ fontSize: "0.74rem", color: "#64748b", fontWeight: 600 }}>{c.prixParNuit} MAD / nuit</div>
+                        </td>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-                  {filteredAlertesNouvelles.map((item) => (
-                    <div key={item.id} style={{ backgroundColor: "#fff5f5", padding: "16px", borderRadius: "12px", border: "1px solid #fecaca" }}>
-                      <div style={{ fontWeight: 800, color: "#991b1b", fontSize: "0.92rem" }}>Réservation #{item.id.substring(0, 8)}</div>
-                      <div style={{ color: "#475569", fontSize: "0.82rem", marginTop: "4px" }}>Séjour : Du {item.dateDebut} au {item.dateFin}</div>
-                      <div style={{ fontWeight: 800, color: "#1e293b", fontSize: "0.9rem", marginTop: "4px" }}>Total : {item.prixTotal} MAD</div>
-                      <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
-                        <button
-                          onClick={() => handleUpdateReservationStatus(item.id, "CONFIRMEE")}
-                          style={{
-                            flex: 1.4,
-                            backgroundColor: "#10b981",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "8px",
-                            padding: "8px 10px",
-                            fontSize: "0.8rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "4px"
-                          }}
-                          title="Valider le paiement et passer la chambre en OCCUPÉE"
-                        >
-                          💵 Encaisser & Occuper
-                        </button>
-                        <button
-                          onClick={() => handleUpdateReservationStatus(item.id, "REFUSEE")}
-                          style={{
-                            flex: 0.8,
-                            backgroundColor: "#ef4444",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "8px",
-                            padding: "8px 10px",
-                            fontSize: "0.8rem",
-                            fontWeight: 800,
-                            cursor: "pointer"
-                          }}
-                        >
-                          Refuser
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        {/* 7 Jours de la Semaine */}
+                        {weekDays.map((d, idx) => {
+                          const booking = getRoomBookingForDay(c.id, d.iso);
+                          const isOccupied = Boolean(booking);
+                          const isCheckInDay = isOccupied && booking.dateDebut === d.iso;
+                          const clientName = isOccupied
+                            ? (booking.clientPrenom || booking.client?.prenom || "") + " " + (booking.clientNom || booking.client?.nom || "Invité")
+                            : "";
+
+                          return (
+                            <td
+                              key={idx}
+                              onClick={() => {
+                                if (isOccupied) {
+                                  setSelectedScheduleReservation(booking);
+                                } else {
+                                  setDirectBookingForm({
+                                    riadId: selectedRiad?.id || (riads[0]?.id || ""),
+                                    chambreId: c.id,
+                                    riadEntier: false,
+                                    nom: "",
+                                    prenom: "",
+                                    email: "",
+                                    telephone: "",
+                                    dateDebut: d.iso,
+                                    dateFin: new Date(new Date(d.iso).getTime() + 86400000).toISOString().split("T")[0],
+                                    methodePaiement: "SUR_PLACE"
+                                  });
+                                  setShowDirectBookingModal(true);
+                                }
+                              }}
+                              style={{
+                                textAlign: "center",
+                                padding: "10px 6px",
+                                borderRadius: "12px",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                backgroundColor: isOccupied
+                                  ? isCheckInDay
+                                    ? "#fef3c7"
+                                    : "#fee2e2"
+                                  : "#f0fdf4",
+                                border: isOccupied
+                                  ? isCheckInDay
+                                    ? "1.5px solid #fde68a"
+                                    : "1.5px solid #fca5a5"
+                                  : "1px solid #bbf7d0",
+                                verticalAlign: "middle"
+                              }}
+                              title={
+                                isOccupied
+                                  ? `Occupée par ${clientName.trim()} (${booking.prixTotal} MAD) - Cliquer pour détails`
+                                  : `Libre (${c.prixParNuit} MAD) - Cliquer pour réservation directe`
+                              }
+                            >
+                              {isOccupied ? (
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: "0.72rem",
+                                      fontWeight: 800,
+                                      color: isCheckInDay ? "#92400e" : "#991b1b",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      maxWidth: "100px",
+                                      margin: "0 auto",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "4px"
+                                    }}
+                                  >
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: isCheckInDay ? "#d97706" : "#dc2626", display: "inline-block" }} />
+                                    {clientName.trim().split(" ")[0]}
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: 700,
+                                      color: isCheckInDay ? "#b45309" : "#b91c1c",
+                                      marginTop: "2px"
+                                    }}
+                                  >
+                                    {isCheckInDay ? "Arrivée" : "Occupé"}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#15803d", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#16a34a", display: "inline-block" }} />
+                                    Libre
+                                  </div>
+                                  <div style={{ fontSize: "0.65rem", color: "#16a34a", fontWeight: 600, marginTop: "2px" }}>
+                                    {c.prixParNuit} MAD
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
 
-            {/* Arrivées du Jour & Check-in */}
-            <div style={{ backgroundColor: "#ffffff", padding: "24px 26px", borderRadius: "20px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-                <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "1.02rem", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ width: "34px", height: "34px", borderRadius: "10px", backgroundColor: "#e0f2fe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>
-                    🛎️
-                  </div>
-                  <div>
-                    <div>Arrivées du Jour (Check-in)</div>
-                    <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Enregistrement & vérification d'identité</div>
-                  </div>
-                </div>
-                <span style={{ backgroundColor: "#e0f2fe", color: "#0369a1", fontSize: "0.78rem", fontWeight: 800, padding: "5px 14px", borderRadius: "20px" }}>
-                  {filteredAlertesArrivees.length} client(s)
-                </span>
+            {/* Légende du Planning */}
+            <div
+              style={{
+                display: "flex",
+                gap: "18px",
+                marginTop: "16px",
+                paddingTop: "12px",
+                borderTop: "1px solid #f1f5f9",
+                fontSize: "0.76rem",
+                color: "#64748b",
+                fontWeight: 700,
+                flexWrap: "wrap"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#16a34a", display: "inline-block" }} />
+                <span>Chambre Libre (Cliquer pour réserver)</span>
               </div>
-
-              {filteredAlertesArrivees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 12px", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", border: "1px dashed #cbd5e1" }}>
-                  <div style={{ fontSize: "1.8rem", marginBottom: "6px" }}>🌴</div>
-                  <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600 }}>Aucun check-in prévu pour aujourd'hui.</p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {filteredAlertesArrivees.map((item) => {
-                    const clientName = (item.clientPrenom || item.client?.prenom || "") + " " + (item.clientNom || item.client?.nom || "Client Invité");
-                    const roomName = item.riadEntier ? "Riad Entier" : (item.chambres && item.chambres.length > 0 ? item.chambres.map(c => c.nomChambre).join(", ") : "Chambre");
-                    const isCheckedIn = Boolean(item.checkInEffectue);
-
-                    return (
-                      <div
-                        key={item.id}
-                        style={{
-                          backgroundColor: isCheckedIn ? "#f0fdf4" : "#f0f9ff",
-                          padding: "16px 18px",
-                          borderRadius: "14px",
-                          border: isCheckedIn ? "1px solid #bbf7d0" : "1px solid #bae6fd",
-                          borderLeft: isCheckedIn ? "5px solid #16a34a" : "5px solid #0284c7"
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
-                          <div>
-                            <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.94rem" }}>
-                              👤 {clientName.trim()}
-                            </div>
-                            <div style={{ color: "#475569", fontSize: "0.8rem", marginTop: "2px" }}>
-                              🛏️ {roomName} • Séjour du <strong>{item.dateDebut}</strong> au <strong>{item.dateFin}</strong>
-                            </div>
-                          </div>
-                          <span
-                            style={{
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              padding: "4px 10px",
-                              borderRadius: "12px",
-                              backgroundColor: isCheckedIn ? "#dcfce7" : "#fef3c7",
-                              color: isCheckedIn ? "#15803d" : "#b45309"
-                            }}
-                          >
-                            {isCheckedIn ? "✓ CHECK-IN EFFECTUÉ" : "⏳ ATTENDU"}
-                          </span>
-                        </div>
-
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", paddingTop: "10px", borderTop: isCheckedIn ? "1px solid #dcfce7" : "1px solid #e0f2fe" }}>
-                          <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a" }}>
-                            Total : {item.prixTotal} MAD
-                          </div>
-
-                          <div style={{ display: "flex", gap: "8px" }}>
-                            {!isCheckedIn ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenCheckInModal(item)}
-                                style={{
-                                  backgroundColor: "var(--terracotta, #d96b43)",
-                                  color: "#ffffff",
-                                  border: "none",
-                                  borderRadius: "8px",
-                                  padding: "7px 14px",
-                                  fontSize: "0.8rem",
-                                  fontWeight: 800,
-                                  cursor: "pointer",
-                                  boxShadow: "0 2px 10px rgba(217, 107, 67, 0.3)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "5px"
-                                }}
-                              >
-                                🔑 Effectuer le Check-in
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setViewingCheckInVoucher(item)}
-                                style={{
-                                  backgroundColor: "#ffffff",
-                                  color: "#16a34a",
-                                  border: "1px solid #86efac",
-                                  borderRadius: "8px",
-                                  padding: "6px 12px",
-                                  fontSize: "0.78rem",
-                                  fontWeight: 800,
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "5px"
-                                }}
-                              >
-                                📄 Voir Fiche Check-in
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#dc2626", display: "inline-block" }} />
+                <span>Chambre Occupée (Cliquer pour détails)</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#d97706", display: "inline-block" }} />
+                <span>Arrivée / Check-in prévu ce jour</span>
+              </div>
             </div>
           </section>
+        </div>
+      )}
 
-          {/* ── SUIVI DES RÉSERVATIONS (Intégré dans le Tableau de Bord Opérationnel) ── */}
-          <section style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "20px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "16px" }}>
-              <div>
-                <h2 style={{ fontSize: "1.25rem", color: "#0f172a", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: "rgba(217, 107, 67, 0.12)", color: "var(--terracotta, #d96b43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>
-                    📜
-                  </div>
-                  Suivi des Réservations & Check-in
-                </h2>
-                <p style={{ color: "#64748b", fontSize: "0.85rem", margin: "4px 0 0 0" }}>
-                  Consultez, enregistrez le check-in des clients à l'arrivée et imprimez les fiches officielles.
-                </p>
+      {/* Modale Rapide Détails Séjour depuis le Planning */}
+      {selectedScheduleReservation && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1050,
+            padding: "20px"
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "20px",
+              width: "100%",
+              maxWidth: "460px",
+              padding: "26px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Détails de la Réservation
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedScheduleReservation(null)}
+                style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", color: "#64748b" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: "#f8fafc", borderRadius: "12px", padding: "16px", marginBottom: "16px", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontWeight: 800, fontSize: "1rem", color: "#0f172a", display: "flex", alignItems: "center", gap: "6px" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                {(selectedScheduleReservation.clientPrenom || selectedScheduleReservation.client?.prenom || "") + " " + (selectedScheduleReservation.clientNom || selectedScheduleReservation.client?.nom || "Client Invité")}
+              </div>
+              <div style={{ color: "#475569", fontSize: "0.82rem", marginTop: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                {selectedScheduleReservation.clientTelephone || selectedScheduleReservation.client?.telephone || "Non renseigné"}
+              </div>
+              <div style={{ color: "#475569", fontSize: "0.82rem", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                {selectedScheduleReservation.clientEmail || selectedScheduleReservation.client?.email || "Non renseigné"}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "18px", fontSize: "0.85rem" }}>
+              <div style={{ backgroundColor: "#f1f5f9", padding: "10px", borderRadius: "8px" }}>
+                <div style={{ color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>DATES DU SÉJOUR</div>
+                <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>
+                  {selectedScheduleReservation.dateDebut} au {selectedScheduleReservation.dateFin}
+                </div>
               </div>
 
-              {/* Filtres par statut */}
+              <div style={{ backgroundColor: "#f1f5f9", padding: "10px", borderRadius: "8px" }}>
+                <div style={{ color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>MONTANT TOTAL</div>
+                <div style={{ fontWeight: 800, color: "var(--terracotta, #d96b43)", marginTop: "2px" }}>
+                  {selectedScheduleReservation.prixTotal} MAD
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              {!selectedScheduleReservation.checkInEffectue ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = selectedScheduleReservation;
+                    setSelectedScheduleReservation(null);
+                    handleOpenCheckInModal(item);
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "var(--terracotta, #d96b43)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "10px",
+                    padding: "10px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  Effectuer le Check-in
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = selectedScheduleReservation;
+                    setSelectedScheduleReservation(null);
+                    setViewingCheckInVoucher(item);
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#16a34a",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "10px",
+                    padding: "10px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  Voir Fiche de Police
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setSelectedScheduleReservation(null)}
+                style={{
+                  backgroundColor: "#ffffff",
+                  color: "#64748b",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "10px",
+                  padding: "10px 16px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontSize: "0.85rem"
+                }}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VUE 2: GESTION COMPLÈTE DES RÉSERVATIONS & CHECK-IN (tab=reservations) ── */}
+      {activeTab === "reservations" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {/* Header & Quick Action */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
+                Gestion des Réservations & Check-in
+              </h1>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setDirectBookingForm({
+                  riadId: selectedRiad?.id || (riads[0]?.id || ""),
+                  chambreId: chambres[0]?.id || "",
+                  riadEntier: false,
+                  nom: "",
+                  prenom: "",
+                  email: "",
+                  telephone: "",
+                  dateDebut: new Date().toISOString().split("T")[0],
+                  dateFin: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+                  methodePaiement: "SUR_PLACE"
+                });
+                setShowDirectBookingModal(true);
+              }}
+              style={{
+                backgroundColor: "var(--terracotta, #d96b43)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "10px",
+                padding: "10px 18px",
+                fontSize: "0.85rem",
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                boxShadow: "0 4px 14px rgba(217, 107, 67, 0.35)"
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvelle Réservation Directe
+            </button>
+          </div>
+
+          {/* Tableau Principal avec Filtres Intégrés */}
+          <section style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "20px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px", flexWrap: "wrap", gap: "16px" }}>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {[
                   { label: "Toutes", value: "TOUTES", count: filteredReservations.length },
-                  { label: "En Attente", value: "EN_ATTENTE", count: filteredReservations.filter((r) => r.statut === "EN_ATTENTE").length },
-                  { label: "Confirmées", value: "CONFIRMEE", count: filteredReservations.filter((r) => r.statut === "CONFIRMEE").length },
-                  { label: "Refusées", value: "REFUSEE", count: filteredReservations.filter((r) => r.statut === "REFUSEE").length }
+                  { label: "En Attente", value: "EN_ATTENTE", count: filteredReservations.filter((r) => r.statut === "EN_ATTENTE").length, dotColor: "#ef4444" },
+                  { label: "Arrivées du Jour", value: "ARRIVEES", count: filteredAlertesArrivees.length, dotColor: "#0284c7" },
+                  { label: "Confirmées", value: "CONFIRMEE", count: filteredReservations.filter((r) => r.statut === "CONFIRMEE").length, dotColor: "#10b981" },
+                  { label: "Refusées", value: "REFUSEE", count: filteredReservations.filter((r) => r.statut === "REFUSEE").length, dotColor: "#94a3b8" }
                 ].map((f) => {
                   const isActive = reservationFilter === f.value;
                   return (
@@ -1182,18 +1490,36 @@ function ProprietaireDashboardInner() {
                       key={f.value}
                       onClick={() => setReservationFilter(f.value)}
                       style={{
-                        padding: "6px 14px",
+                        padding: "8px 16px",
                         borderRadius: "10px",
-                        fontSize: "0.8rem",
+                        fontSize: "0.82rem",
                         fontWeight: isActive ? 800 : 600,
-                        border: isActive ? "1px solid var(--terracotta, #d96b43)" : "1px solid #cbd5e1",
+                        border: isActive ? "2px solid var(--terracotta, #d96b43)" : "1px solid #cbd5e1",
                         backgroundColor: isActive ? "rgba(217, 107, 67, 0.12)" : "#f8fafc",
                         color: isActive ? "var(--terracotta, #d96b43)" : "#475569",
                         cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
                         transition: "all 0.2s"
                       }}
                     >
-                      {f.label} ({f.count})
+                      {f.dotColor && (
+                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: f.dotColor, display: "inline-block" }} />
+                      )}
+                      {f.label}
+                      <span
+                        style={{
+                          backgroundColor: isActive ? "var(--terracotta, #d96b43)" : "#e2e8f0",
+                          color: isActive ? "#ffffff" : "#475569",
+                          fontSize: "0.72rem",
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: "10px"
+                        }}
+                      >
+                        {f.count}
+                      </span>
                     </button>
                   );
                 })}
@@ -1201,8 +1527,11 @@ function ProprietaireDashboardInner() {
             </div>
 
             {displayedReservations.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "36px 20px", color: "#64748b" }}>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: "0.9rem" }}>Aucune réservation trouvée pour ce filtre.</p>
+              <div style={{ textAlign: "center", padding: "48px 20px", color: "#64748b" }}>
+                <div style={{ marginBottom: "8px" }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto" }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem" }}>Aucune réservation trouvée pour ce filtre.</p>
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
@@ -1210,12 +1539,12 @@ function ProprietaireDashboardInner() {
                   <thead>
                     <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
                       <th style={{ padding: "12px 10px", fontWeight: 800 }}>ID Réservation</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Client</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Client & Contact</th>
                       <th style={{ padding: "12px 10px", fontWeight: 800 }}>Dates Séjour</th>
                       <th style={{ padding: "12px 10px", fontWeight: 800 }}>Montant</th>
                       <th style={{ padding: "12px 10px", fontWeight: 800 }}>Statut</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Check-in</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800, textAlign: "right" }}>Actions</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Check-in Client</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800, textAlign: "right" }}>Actions Opérationnelles</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1301,14 +1630,15 @@ function ProprietaireDashboardInner() {
                                     fontSize: "0.78rem",
                                     fontWeight: 800,
                                     cursor: "pointer",
-                                    display: "flex",
+                                    display: "inline-flex",
                                     alignItems: "center",
-                                    gap: "4px",
+                                    gap: "6px",
                                     boxShadow: "0 2px 8px rgba(217, 107, 67, 0.25)"
                                   }}
                                   title="Enregistrer les informations d'identité du client pour le check-in"
                                 >
-                                  🔑 Check-in
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                  Check-in
                                 </button>
                               )}
 
@@ -1325,13 +1655,14 @@ function ProprietaireDashboardInner() {
                                     fontSize: "0.78rem",
                                     fontWeight: 700,
                                     cursor: "pointer",
-                                    display: "flex",
+                                    display: "inline-flex",
                                     alignItems: "center",
-                                    gap: "4px"
+                                    gap: "6px"
                                   }}
                                   title="Consulter ou imprimer la fiche de police / check-in"
                                 >
-                                  📄 Fiche
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                  Fiche
                                 </button>
                               )}
 
@@ -1360,11 +1691,37 @@ function ProprietaireDashboardInner() {
       {/* ── VUE 3: GÉRER / MODIFIER / AJOUTER CHAMBRES (tab=chambres) ─────────── */}
       {activeTab === "chambres" && (
         <div style={{ backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
-            <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
               <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
                 Gestion des Chambres
               </h2>
+              {riads.length > 1 && (
+                <select
+                  value={selectedRiadId}
+                  onChange={(e) => {
+                    const targetRiad = riads.find((r) => r.id === e.target.value);
+                    if (targetRiad) handleSelectRiad(targetRiad);
+                  }}
+                  style={{
+                    backgroundColor: "rgba(217, 107, 67, 0.12)",
+                    color: "var(--terracotta, #d96b43)",
+                    fontSize: "0.85rem",
+                    fontWeight: 800,
+                    padding: "6px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(217, 107, 67, 0.3)",
+                    cursor: "pointer",
+                    outline: "none"
+                  }}
+                >
+                  {riads.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.nom} ({r.ville})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <button
               onClick={() => setShowAddRoomModal(true)}
@@ -1377,10 +1734,14 @@ function ProprietaireDashboardInner() {
                 fontWeight: 700,
                 cursor: "pointer",
                 fontSize: "0.9rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
                 boxShadow: "0 4px 12px rgba(217, 107, 67, 0.25)"
               }}
             >
-              ➕ Ajouter une chambre
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Ajouter une chambre
             </button>
           </div>
 
@@ -1424,24 +1785,34 @@ function ProprietaireDashboardInner() {
                             : ch.statut === "RESERVEE"
                             ? "#b45309"
                             : "#15803d",
+                        padding: "4px 10px",
+                        borderRadius: "20px",
                         fontSize: "0.75rem",
                         fontWeight: 800,
-                        padding: "5px 12px",
-                        borderRadius: "20px",
                         boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                        border:
-                          ch.statut === "OCCUPEE"
-                            ? "1px solid #fecaca"
-                            : ch.statut === "RESERVEE"
-                            ? "1px solid #fde68a"
-                            : "1px solid #bbf7d0"
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
                       }}
                     >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          backgroundColor:
+                            ch.statut === "OCCUPEE"
+                              ? "#dc2626"
+                              : ch.statut === "RESERVEE"
+                              ? "#d97706"
+                              : "#16a34a"
+                        }}
+                      />
                       {ch.statut === "OCCUPEE"
-                        ? "🔴 Occupée"
+                        ? "Occupée"
                         : ch.statut === "RESERVEE"
-                        ? "🟡 Réservée (Paiement sur place)"
-                        : "🟢 Disponible"}
+                        ? "Réservée (Sur place)"
+                        : "Disponible"}
                     </span>
                   </div>
 
@@ -1480,10 +1851,15 @@ function ProprietaireDashboardInner() {
                             backgroundColor: ch.statut === "DISPONIBLE" || !ch.statut ? "#dcfce7" : "#f8fafc",
                             color: ch.statut === "DISPONIBLE" || !ch.statut ? "#15803d" : "#64748b",
                             border: ch.statut === "DISPONIBLE" || !ch.statut ? "2px solid #16a34a" : "1px solid #e2e8f0",
-                            cursor: "pointer"
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "4px"
                           }}
                         >
-                          🟢 Dispo
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#16a34a" }} />
+                          Dispo
                         </button>
                         <button
                           type="button"
@@ -1496,10 +1872,15 @@ function ProprietaireDashboardInner() {
                             backgroundColor: ch.statut === "RESERVEE" ? "#fef3c7" : "#f8fafc",
                             color: ch.statut === "RESERVEE" ? "#b45309" : "#64748b",
                             border: ch.statut === "RESERVEE" ? "2px solid #d97706" : "1px solid #e2e8f0",
-                            cursor: "pointer"
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "4px"
                           }}
                         >
-                          🟡 Réservée
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#d97706" }} />
+                          Réservée
                         </button>
                         <button
                           type="button"
@@ -1512,10 +1893,15 @@ function ProprietaireDashboardInner() {
                             backgroundColor: ch.statut === "OCCUPEE" ? "#fee2e2" : "#f8fafc",
                             color: ch.statut === "OCCUPEE" ? "#991b1b" : "#64748b",
                             border: ch.statut === "OCCUPEE" ? "2px solid #ef4444" : "1px solid #e2e8f0",
-                            cursor: "pointer"
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "4px"
                           }}
                         >
-                          🔴 Occupée
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#dc2626" }} />
+                          Occupée
                         </button>
                       </div>
                     </div>
@@ -1540,13 +1926,14 @@ function ProprietaireDashboardInner() {
                         fontSize: "0.82rem",
                         fontWeight: 700,
                         cursor: "pointer",
-                        display: "flex",
+                        display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
                         gap: "6px"
                       }}
                     >
-                      ✏️ Modifier
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                      Modifier
                     </button>
                     <button
                       onClick={() => handleToggleRoomDispo(ch)}
@@ -1559,10 +1946,15 @@ function ProprietaireDashboardInner() {
                         borderRadius: "10px",
                         fontSize: "0.82rem",
                         fontWeight: 700,
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px"
                       }}
                     >
-                      {ch.disponible ? "🔴 Masquer" : "🟢 Publier"}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      {ch.disponible ? "Masquer" : "Publier"}
                     </button>
                   </div>
 
@@ -1578,197 +1970,18 @@ function ProprietaireDashboardInner() {
                       fontSize: "0.82rem",
                       fontWeight: 700,
                       cursor: "pointer",
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "6px"
                     }}
                   >
-                    🗑️ Supprimer la Chambre
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Supprimer la Chambre
                   </button>
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── VUE : PLANNING & CALENDRIER DES DISPONIBILITÉS (tab=planning) ─────────── */}
-      {activeTab === "planning" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {/* En-tête avec Sélecteur de Riad et Sélecteur de Chambre */}
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              padding: "24px 28px",
-              borderRadius: "18px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-              border: "1px solid #e2e8f0",
-              display: "flex",
-              flexDirection: "column",
-              gap: "18px"
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-              <div>
-                <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: "0 0 4px 0" }}>
-                  📅 Planning & Calendrier des Disponibilités
-                </h2>
-                <p style={{ color: "#64748b", margin: 0, fontSize: "0.88rem" }}>
-                  Visualisez les jours réservés (🟡 acompte requis) et occupés (🔴 payés/confirmés) pour chaque chambre et le Riad entier.
-                </p>
-              </div>
-
-              {/* Sélecteur de Riad si le propriétaire en possède plusieurs */}
-              {filteredRiads.length > 1 && (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#64748b" }}>Riad :</span>
-                  {filteredRiads.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => handleSelectRiad(r)}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "8px",
-                        fontSize: "0.82rem",
-                        fontWeight: r.id === selectedRiadId ? 800 : 600,
-                        backgroundColor: r.id === selectedRiadId ? "rgba(217, 107, 67, 0.12)" : "#f8fafc",
-                        color: r.id === selectedRiadId ? "var(--terracotta)" : "#475569",
-                        border: r.id === selectedRiadId ? "1.5px solid var(--terracotta)" : "1px solid #cbd5e1",
-                        cursor: "pointer"
-                      }}
-                    >
-                      🏰 {r.nom}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sélecteur de Chambre / Riad Entier */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", paddingTop: "14px", borderTop: "1px solid #f1f5f9" }}>
-              <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Filtrer par :
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedPlanningRoomId("ALL")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "10px",
-                  fontSize: "0.84rem",
-                  fontWeight: selectedPlanningRoomId === "ALL" ? 800 : 600,
-                  backgroundColor: selectedPlanningRoomId === "ALL" ? "var(--terracotta)" : "#f8fafc",
-                  color: selectedPlanningRoomId === "ALL" ? "#ffffff" : "#475569",
-                  border: selectedPlanningRoomId === "ALL" ? "none" : "1px solid #cbd5e1",
-                  cursor: "pointer"
-                }}
-              >
-                Vue Globale
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPlanningRoomId("ENTIRE_RIAD")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "10px",
-                  fontSize: "0.84rem",
-                  fontWeight: selectedPlanningRoomId === "ENTIRE_RIAD" ? 800 : 600,
-                  backgroundColor: selectedPlanningRoomId === "ENTIRE_RIAD" ? "var(--terracotta)" : "#f8fafc",
-                  color: selectedPlanningRoomId === "ENTIRE_RIAD" ? "#ffffff" : "#475569",
-                  border: selectedPlanningRoomId === "ENTIRE_RIAD" ? "none" : "1px solid #cbd5e1",
-                  cursor: "pointer"
-                }}
-              >
-                ✨ Riad Entier
-              </button>
-              {chambres.map((ch) => (
-                <button
-                  key={ch.id}
-                  type="button"
-                  onClick={() => setSelectedPlanningRoomId(ch.id)}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "10px",
-                    fontSize: "0.84rem",
-                    fontWeight: selectedPlanningRoomId === ch.id ? 800 : 600,
-                    backgroundColor: selectedPlanningRoomId === ch.id ? "var(--terracotta)" : "#f8fafc",
-                    color: selectedPlanningRoomId === ch.id ? "#ffffff" : "#475569",
-                    border: selectedPlanningRoomId === ch.id ? "none" : "1px solid #cbd5e1",
-                    cursor: "pointer"
-                  }}
-                >
-                  🛏️ {ch.nomChambre}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Composant Calendrier des Disponibilités */}
-          <div style={{ backgroundColor: "#ffffff", borderRadius: "18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", padding: "8px" }}>
-            <AvailabilityCalendar
-              planningDates={planningDates}
-              selectedRoomId={selectedPlanningRoomId === "ALL" || selectedPlanningRoomId === "ENTIRE_RIAD" ? null : selectedPlanningRoomId}
-              isRiadEntier={selectedPlanningRoomId === "ENTIRE_RIAD"}
-              interactive={false}
-              language={language}
-            />
-          </div>
-
-          {/* Liste des Réservations associées au planning */}
-          <div style={{ backgroundColor: "#ffffff", padding: "24px 28px", borderRadius: "18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
-            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>
-              📋 Détail des Réservations Enregistrées sur ce Riad
-            </h3>
-
-            {planningDates.length === 0 ? (
-              <p style={{ color: "#64748b", margin: 0, fontSize: "0.9rem" }}>
-                Aucune réservation enregistrée pour ce Riad actuellement.
-              </p>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
-                {planningDates.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      backgroundColor: item.statut === "OCCUPE" ? "#fef2f2" : "#fffbeb",
-                      border: `1.5px solid ${item.statut === "OCCUPE" ? "#fca5a5" : "#fcd34d"}`,
-                      borderRadius: "14px",
-                      padding: "16px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px"
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <strong style={{ fontSize: "0.95rem", color: item.statut === "OCCUPE" ? "#991b1b" : "#92400e" }}>
-                        {item.nomChambre || (item.riadEntier ? "Riad Entier" : "Chambre")}
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: "0.72rem",
-                          fontWeight: 800,
-                          padding: "3px 8px",
-                          borderRadius: "12px",
-                          backgroundColor: item.statut === "OCCUPE" ? "#fee2e2" : "#fef3c7",
-                          color: item.statut === "OCCUPE" ? "#b91c1c" : "#b45309",
-                          border: `1px solid ${item.statut === "OCCUPE" ? "#fca5a5" : "#fde68a"}`
-                        }}
-                      >
-                        {item.statut === "OCCUPE" ? "🔴 OCCUPÉE (Payée)" : "🟡 RÉSERVÉE (Acompte)"}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "0.85rem", color: "#334155" }}>
-                      📅 <strong>Du {item.dateDebut} au {item.dateFin}</strong>
-                    </div>
-                    <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
-                      Statut : {item.statutReservation || item.statut}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1791,12 +2004,9 @@ function ProprietaireDashboardInner() {
             }}
           >
             <div>
-              <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--terracotta)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
-                Gestion de vos Riads
-              </div>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                {services.nom || "Fiche du Riad"}
-              </h3>
+              <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
+                Gestion des Riads
+              </h2>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
@@ -1807,7 +2017,7 @@ function ProprietaireDashboardInner() {
                     key={r.id}
                     onClick={() => handleSelectRiad(r)}
                     style={{
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
                       gap: "8px",
                       padding: "8px 16px",
@@ -1821,7 +2031,7 @@ function ProprietaireDashboardInner() {
                       transition: "all 0.2s"
                     }}
                   >
-                    <span>🏰</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>
                     {r.nom}
                   </button>
                 );
@@ -1834,8 +2044,9 @@ function ProprietaireDashboardInner() {
               <div style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                   <h4 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>Fiche Riad</h4>
-                  <button type="submit" disabled={isSavingRiad} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "8px 18px", borderRadius: "8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
-                    {isSavingRiad ? "Enregistrement..." : "💾 Enregistrer"}
+                  <button type="submit" disabled={isSavingRiad} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "8px 18px", borderRadius: "8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    {isSavingRiad ? "Enregistrement..." : "Enregistrer"}
                   </button>
                 </div>
 
@@ -1934,13 +2145,10 @@ function ProprietaireDashboardInner() {
       {/* ── VUE 5: PARAMÈTRES DE PROFIL DU PROPRIÉTAIRE (tab=parametres) ─────── */}
       {activeTab === "parametres" && (
         <div style={{ backgroundColor: "#ffffff", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", maxWidth: "680px", margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: "32px" }}>
-            <h2 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: "0 0 8px 0" }}>
+          <div style={{ textAlign: "center", marginBottom: "28px" }}>
+            <h2 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
               Paramètres du Profil
             </h2>
-            <p style={{ color: "#64748b", fontSize: "0.88rem", margin: 0 }}>
-              Gérez vos informations personnelles et sécurisez l'accès à votre Espace Gérant.
-            </p>
           </div>
 
           <form onSubmit={handleUpdateProfile}>
@@ -2027,10 +2235,14 @@ function ProprietaireDashboardInner() {
                   fontSize: "0.95rem",
                   cursor: "pointer",
                   boxShadow: "0 4px 15px rgba(15, 23, 42, 0.2)",
-                  transition: "all 0.2s ease"
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px"
                 }}
               >
-                💾 Enregistrer les Modifications
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Enregistrer les Modifications
               </button>
 
               <button
@@ -2050,12 +2262,13 @@ function ProprietaireDashboardInner() {
                   fontSize: "0.95rem",
                   cursor: "pointer",
                   transition: "all 0.2s ease",
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
                   gap: "8px"
                 }}
               >
-                🔒 Déconnexion Sécurisée
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Déconnexion Sécurisée
               </button>
             </div>
           </form>
@@ -2108,7 +2321,7 @@ function ProprietaireDashboardInner() {
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px" }}>
                 <button type="button" disabled={isSubmittingRoom} onClick={() => setShowAddRoomModal(false)} style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: isSubmittingRoom ? "not-allowed" : "pointer" }}>Annuler</button>
                 <button type="submit" disabled={isSubmittingRoom} style={{ padding: "10px 18px", borderRadius: "10px", border: "none", backgroundColor: "var(--terracotta)", color: "#ffffff", fontWeight: 700, cursor: isSubmittingRoom ? "not-allowed" : "pointer", opacity: isSubmittingRoom ? 0.7 : 1 }}>
-                  {isSubmittingRoom ? "⏳ Enregistrement..." : "Créer la Chambre"}
+                  {isSubmittingRoom ? "Enregistrement..." : "Créer la Chambre"}
                 </button>
               </div>
             </form>
@@ -2187,7 +2400,13 @@ function ProprietaireDashboardInner() {
       {roomToDelete && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: "20px" }}>
           <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "32px", maxWidth: "440px", width: "100%", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>⚠️</div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#0f172a", margin: "0 0 8px 0" }}>Supprimer la Chambre ?</h3>
             <p style={{ fontSize: "0.88rem", color: "#64748b", marginBottom: "24px" }}>Êtes-vous sûr de vouloir supprimer la chambre <strong>"{roomToDelete.nomChambre}"</strong> ?</p>
             <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
@@ -2207,8 +2426,8 @@ function ProprietaireDashboardInner() {
             <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, var(--terracotta, #d96b43) 100%)", color: "#ffffff", padding: "26px 32px", borderRadius: "24px 24px 0 0", position: "relative" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                  <div style={{ width: "46px", height: "46px", borderRadius: "14px", backgroundColor: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem" }}>
-                    🛎️
+                  <div style={{ width: "46px", height: "46px", borderRadius: "14px", backgroundColor: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                   </div>
                   <div>
                     <h3 style={{ fontSize: "1.3rem", fontWeight: 800, margin: 0, letterSpacing: "-0.2px" }}>
@@ -2281,7 +2500,8 @@ function ProprietaireDashboardInner() {
               {/* Pièce d'identité : CIN / Passeport */}
               <div style={{ backgroundColor: "#fef3c7", padding: "16px 20px", borderRadius: "14px", border: "1px solid #fde68a", marginBottom: "18px" }}>
                 <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#92400e", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>🪪</span> Informations d'Identité Légale (Fiche de Police)
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  Informations d'Identité Légale (Fiche de Police)
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "14px" }}>
                   <div>
@@ -2390,7 +2610,7 @@ function ProprietaireDashboardInner() {
                     onChange={(e) => setCheckInForm({ ...checkInForm, paiementEffectueSurPlace: e.target.checked })}
                     style={{ width: "18px", height: "18px", accentColor: "#16a34a" }}
                   />
-                  <span>💵 Confirmer le règlement du séjour ({checkInReservation.prixTotal} MAD)</span>
+                  <span>Confirmer le règlement du séjour ({checkInReservation.prixTotal} MAD)</span>
                 </label>
                 {checkInForm.paiementEffectueSurPlace && (
                   <div style={{ marginTop: "10px", display: "flex", gap: "12px", alignItems: "center" }}>
@@ -2448,12 +2668,13 @@ function ProprietaireDashboardInner() {
                     fontSize: "0.95rem",
                     cursor: isSubmittingCheckIn ? "not-allowed" : "pointer",
                     boxShadow: "0 4px 15px rgba(16, 185, 129, 0.35)",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
                     gap: "8px"
                   }}
                 >
-                  {isSubmittingCheckIn ? "⏳ Validation en cours..." : "✨ Confirmer & Valider le Check-in"}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {isSubmittingCheckIn ? "Validation en cours..." : "Confirmer & Valider le Check-in"}
                 </button>
               </div>
             </form>
@@ -2469,7 +2690,8 @@ function ProprietaireDashboardInner() {
             {/* Action Bar */}
             <div style={{ padding: "16px 28px", backgroundColor: "#0f172a", color: "#ffffff", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "20px 20px 0 0" }}>
               <div style={{ fontWeight: 800, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "10px" }}>
-                <span>📋</span> Fiche d'Enregistrement Client (Check-in Validé)
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Fiche d'Enregistrement Client (Check-in Validé)
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <button
@@ -2484,12 +2706,13 @@ function ProprietaireDashboardInner() {
                     fontWeight: 800,
                     fontSize: "0.85rem",
                     cursor: "pointer",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
                     gap: "6px"
                   }}
                 >
-                  🖨️ Imprimer la Fiche
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                  Imprimer la Fiche
                 </button>
                 <button
                   type="button"
@@ -2507,10 +2730,10 @@ function ProprietaireDashboardInner() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #e2e8f0", paddingBottom: "20px", marginBottom: "24px" }}>
                 <div>
                   <div style={{ fontSize: "1.5rem", fontWeight: 900, color: "var(--terracotta, #d96b43)" }}>
-                    🏰 {viewingCheckInVoucher.riad?.nom || selectedRiad?.nom || "Riad Authentique"}
+                    {viewingCheckInVoucher.riad?.nom || selectedRiad?.nom || "Riad Authentique"}
                   </div>
                   <div style={{ fontSize: "0.85rem", color: "#475569", marginTop: "4px" }}>
-                    📍 {viewingCheckInVoucher.riad?.adresse || selectedRiad?.adresse || "Médina"}, {viewingCheckInVoucher.riad?.ville || selectedRiad?.ville || "Maroc"}
+                    {viewingCheckInVoucher.riad?.adresse || selectedRiad?.adresse || "Médina"}, {viewingCheckInVoucher.riad?.ville || selectedRiad?.ville || "Maroc"}
                   </div>
                   <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>
                     Plateforme Officielle MoroccoRiads • Hospitality Management
@@ -2538,8 +2761,9 @@ function ProprietaireDashboardInner() {
               {/* Tableau Données Client */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
                 <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px" }}>
-                    👤 Renseignements du Client
+                  <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Renseignements du Client
                   </div>
                   <div style={{ fontSize: "0.84rem", display: "flex", flexDirection: "column", gap: "8px" }}>
                     <div><strong>Nom & Prénom :</strong> {viewingCheckInVoucher.clientPrenom || viewingCheckInVoucher.client?.prenom || ""} {viewingCheckInVoucher.clientNom || viewingCheckInVoucher.client?.nom || "Client"}</div>
@@ -2552,8 +2776,9 @@ function ProprietaireDashboardInner() {
                 </div>
 
                 <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px" }}>
-                    🏨 Détails du Séjour
+                  <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                    Détails du Séjour
                   </div>
                   <div style={{ fontSize: "0.84rem", display: "flex", flexDirection: "column", gap: "8px" }}>
                     <div><strong>Date d'Arrivée :</strong> {viewingCheckInVoucher.dateDebut}</div>
@@ -2641,8 +2866,8 @@ function ProprietaireDashboardInner() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ width: "38px", height: "38px", borderRadius: "10px", backgroundColor: "rgba(217, 107, 67, 0.12)", color: "var(--terracotta, #d96b43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>
-                  ➕
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", backgroundColor: "rgba(217, 107, 67, 0.12)", color: "var(--terracotta, #d96b43)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
@@ -2835,10 +3060,14 @@ function ProprietaireDashboardInner() {
                     fontWeight: 800,
                     cursor: "pointer",
                     boxShadow: "0 4px 14px rgba(217, 107, 67, 0.35)",
-                    opacity: isSubmittingDirectBooking ? 0.7 : 1
+                    opacity: isSubmittingDirectBooking ? 0.7 : 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px"
                   }}
                 >
-                  {isSubmittingDirectBooking ? "Enregistrement..." : "✓ Confirmer la Réservation"}
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {isSubmittingDirectBooking ? "Enregistrement..." : "Confirmer la Réservation"}
                 </button>
               </div>
             </form>

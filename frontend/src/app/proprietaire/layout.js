@@ -176,7 +176,7 @@ function ProprietaireLayoutInner({ children }) {
                 user?.prenom ? user.prenom.charAt(0).toUpperCase() : "H"
               )}
 
-              {/* Overlay au survol avec icône caméra */}
+              {/* Overlay au survol avec icône caméra SVG */}
               <div
                 className="avatar-overlay"
                 style={{
@@ -189,19 +189,21 @@ function ProprietaireLayoutInner({ children }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "0.9rem",
                   opacity: 0,
                   transition: "opacity 0.2s ease",
                   borderRadius: "50%"
                 }}
               >
-                📷
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
               </div>
             </label>
 
             <div style={{ overflow: "hidden", flex: 1 }}>
               <div style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, textTransform: "capitalize" }}>
-                {greeting} 👋
+                {greeting}
               </div>
               <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {user?.prenom || "Houda"} {user?.nom || "El Amrani"}
@@ -246,6 +248,35 @@ function ProprietaireLayoutInner({ children }) {
 
               <li>
                 <Link
+                  href="/proprietaire/dashboard?tab=reservations"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    padding: "12px 16px",
+                    borderRadius: "12px",
+                    fontSize: "0.88rem",
+                    fontWeight: currentTab === "reservations" ? 800 : 600,
+                    color: currentTab === "reservations" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
+                    backgroundColor: currentTab === "reservations" ? "rgba(217, 107, 67, 0.18)" : "transparent",
+                    borderLeft: currentTab === "reservations" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
+                    textDecoration: "none",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "reservations" ? 1 : 0.7 }}>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  Réservations & Check-in
+                </Link>
+              </li>
+
+              <li>
+                <Link
                   href="/proprietaire/dashboard?tab=chambres"
                   style={{
                     display: "flex",
@@ -269,39 +300,6 @@ function ProprietaireLayoutInner({ children }) {
                     <path d="M6 8v9" />
                   </svg>
                   Gestion des Chambres
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  href="/proprietaire/dashboard?tab=planning"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "14px",
-                    padding: "12px 16px",
-                    borderRadius: "12px",
-                    fontSize: "0.88rem",
-                    fontWeight: currentTab === "planning" ? 800 : 600,
-                    color: currentTab === "planning" ? "#ffffff" : "rgba(148, 163, 184, 0.8)",
-                    backgroundColor: currentTab === "planning" ? "rgba(217, 107, 67, 0.18)" : "transparent",
-                    borderLeft: currentTab === "planning" ? "4px solid var(--terracotta, #d96b43)" : "4px solid transparent",
-                    textDecoration: "none",
-                    transition: "all 0.2s ease"
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: currentTab === "planning" ? 1 : 0.7 }}>
-                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-                    <line x1="16" x2="16" y1="2" y2="6" />
-                    <line x1="8" x2="8" y1="2" y2="6" />
-                    <line x1="3" x2="21" y1="10" y2="10" />
-                    <path d="M8 14h.01" />
-                    <path d="M12 14h.01" />
-                    <path d="M16 14h.01" />
-                    <path d="M8 18h.01" />
-                    <path d="M12 18h.01" />
-                  </svg>
-                  Planning & Calendrier
                 </Link>
               </li>
 
@@ -441,11 +439,11 @@ function ProprietaireLayoutInner({ children }) {
 
       {/* ── ZONE DE CONTENU PRINCIPAL SANS LE BOUTON ALLER SUR MOROCCORIADS ─────────── */}
       <div style={{ flex: 1, marginLeft: "280px", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        {/* Header Top Bar Épuré */}
+        {/* Header Top Bar Épuré & Responsive */}
         <header
           style={{
-            height: "72px",
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            minHeight: "68px",
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
             backdropFilter: "blur(12px)",
             borderBottom: "1px solid #e2e8f0",
             position: "sticky",
@@ -454,24 +452,33 @@ function ProprietaireLayoutInner({ children }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 36px",
+            padding: "12px 28px",
+            flexWrap: "wrap",
+            gap: "10px",
             boxShadow: "0 4px 20px rgba(0,0,0,0.02)"
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Espace Propriétaire</span>
             <span style={{ color: "#cbd5e1" }}>/</span>
             <span style={{ fontSize: "0.88rem", color: "var(--terracotta, #d96b43)", fontWeight: 800, textTransform: "capitalize" }}>
-              {(currentTab === "dashboard" || currentTab === "historique") && "📊 Tableau de Bord Opérationnel"}
-              {currentTab === "chambres" && "🛏️ Gestion Complète des Chambres"}
-              {currentTab === "riad" && "🏨 Gestion des Riads"}
-              {currentTab === "parametres" && "⚙️ Profil & Paramètres"}
+              {(currentTab === "dashboard" || currentTab === "historique") && "Tableau de Bord Opérationnel"}
+              {currentTab === "reservations" && "Gestion des Réservations & Check-in"}
+              {currentTab === "chambres" && "Gestion Complète des Chambres"}
+              {currentTab === "riad" && "Gestion des Riads"}
+              {currentTab === "parametres" && "Profil & Paramètres"}
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <span style={{ fontSize: "0.85rem", color: "#475569", fontWeight: 700, backgroundColor: "#f1f5f9", padding: "6px 14px", borderRadius: "12px" }}>
-              📅 {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "0.8rem", color: "#475569", fontWeight: 700, backgroundColor: "#f1f5f9", padding: "6px 12px", borderRadius: "10px", border: "1px solid #e2e8f0", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                <line x1="16" x2="16" y1="2" y2="6" />
+                <line x1="8" x2="8" y1="2" y2="6" />
+                <line x1="3" x2="21" y1="10" y2="10" />
+              </svg>
+              {new Date().toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
         </header>

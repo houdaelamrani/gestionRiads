@@ -430,7 +430,10 @@ export default function Home() {
             onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
             title={t("search_title")}
           >
-            🔍
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
           </button>
         </div>
       </section>
@@ -463,26 +466,30 @@ export default function Home() {
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", fontSize: "0.88rem", color: "var(--text-primary)" }}>
                 <span style={{ fontWeight: 700, color: "var(--terracotta)" }}>
-                  ✨ {filteredRiadsList.length} Riad(s) correspondant(s)
+                  {filteredRiadsList.length} Riad(s) correspondant(s)
                 </span>
                 {selectedCity && selectedCity !== "Tous" && (
-                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
-                    📍 {selectedCity}
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {selectedCity}
                   </span>
                 )}
                 {checkIn && checkOut && (
-                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
-                    📅 {checkIn} ➔ {checkOut}
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                    {checkIn} ➔ {checkOut}
                   </span>
                 )}
                 {guests && (
-                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
-                    👥 {guests} Pax
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    {guests} Pax
                   </span>
                 )}
                 {maxBudget && (
-                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600 }}>
-                    💰 Max {maxBudget} MAD
+                  <span style={{ backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                    Max {maxBudget} MAD
                   </span>
                 )}
               </div>
@@ -554,8 +561,8 @@ export default function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                           />
                         ) : (
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", fontSize: "3rem", background: "linear-gradient(135deg, var(--terracotta), var(--majorelle))" }}>
-                            🏡
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%", background: "linear-gradient(135deg, var(--terracotta), var(--majorelle))" }}>
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.5"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>
                           </div>
                         )}
                       </div>
@@ -581,18 +588,21 @@ export default function Home() {
                         {/* Services (Spa, Traiteur, Hammam) */}
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px", marginBottom: "4px" }}>
                           {riad.hasSpa && (
-                            <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: "10px", backgroundColor: "#f3e8ff", color: "#7c3aed", fontWeight: 600 }}>
-                              🧖‍♀️ Spa
+                            <span style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: "10px", backgroundColor: "#f3e8ff", color: "#7c3aed", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                              Spa
                             </span>
                           )}
                           {riad.hasHammam && (
-                            <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: "10px", backgroundColor: "#e0f2fe", color: "#0284c7", fontWeight: 600 }}>
-                              🧼 Hammam
+                            <span style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: "10px", backgroundColor: "#e0f2fe", color: "#0284c7", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                              Hammam
                             </span>
                           )}
                           {riad.hasTraiteur && (
-                            <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: "10px", backgroundColor: "#fef3c7", color: "#d97706", fontWeight: 600 }}>
-                              🍽️ Traiteur
+                            <span style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: "10px", backgroundColor: "#fef3c7", color: "#d97706", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+                              Traiteur
                             </span>
                           )}
                         </div>
@@ -653,12 +663,21 @@ export default function Home() {
             >
               <div
                 style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "14px",
+                  backgroundColor: "#f3e8ff",
                   color: "#7c3aed",
-                  fontSize: "2.5rem",
-                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "18px"
                 }}
               >
-                🧖‍♀️
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
               </div>
               <h3 style={{ fontSize: "1.2rem", marginBottom: "12px", color: "var(--text-primary)" }}>
                 {t("service_spa_title")}
@@ -683,12 +702,20 @@ export default function Home() {
             >
               <div
                 style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "14px",
+                  backgroundColor: "#e0f2fe",
                   color: "#0284c7",
-                  fontSize: "2.5rem",
-                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "18px"
                 }}
               >
-                🧼
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                </svg>
               </div>
               <h3 style={{ fontSize: "1.2rem", marginBottom: "12px", color: "var(--text-primary)" }}>
                 {t("service_hammam_title")}
@@ -713,12 +740,24 @@ export default function Home() {
             >
               <div
                 style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "14px",
+                  backgroundColor: "#fef3c7",
                   color: "#d97706",
-                  fontSize: "2.5rem",
-                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "18px"
                 }}
               >
-                🍽️
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                  <line x1="6" x2="6" y1="1" y2="4"/>
+                  <line x1="10" x2="10" y1="1" y2="4"/>
+                  <line x1="14" x2="14" y1="1" y2="4"/>
+                </svg>
               </div>
               <h3 style={{ fontSize: "1.2rem", marginBottom: "12px", color: "var(--text-primary)" }}>
                 {t("service_traiteur_title")}

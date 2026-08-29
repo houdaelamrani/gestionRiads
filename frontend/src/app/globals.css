@@ -1084,14 +1084,29 @@ nextjs-portal, [data-nextjs-toast], [data-nextjs-dialog-overlay] {
 }
 
 @media print {
-  body * {
+  /* Masquer les éléments de navigation et boutons à l'impression */
+  aside, nav, header, button, .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  main {
+    margin-left: 0 !important;
+    padding: 10px !important;
+    width: 100% !important;
+  }
+
+  /* Si la fiche check-in de police est ouverte */
+  body:has(#printable-checkin-sheet) * {
     visibility: hidden !important;
   }
-  #printable-checkin-sheet,
-  #printable-checkin-sheet * {
+  body:has(#printable-checkin-sheet) #printable-checkin-sheet,
+  body:has(#printable-checkin-sheet) #printable-checkin-sheet * {
     visibility: visible !important;
   }
-  #printable-checkin-sheet {
+  body:has(#printable-checkin-sheet) #printable-checkin-sheet {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;

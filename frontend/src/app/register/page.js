@@ -165,7 +165,13 @@ export default function Register() {
                 textAlign: "center"
               }}
             >
-              <div style={{ fontSize: "1.3rem", marginBottom: "4px" }}>🧳</div>
+              <div style={{ marginBottom: "6px", display: "flex", justifyContent: "center" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={formData.role === "CLIENT" ? "var(--terracotta)" : "var(--text-secondary)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 20h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"/>
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                  <path d="M10 12h4"/>
+                </svg>
+              </div>
               <div style={{ fontWeight: 800, fontSize: "0.88rem", color: formData.role === "CLIENT" ? "var(--terracotta)" : "var(--text-primary)" }}>
                 {language === "en" ? "Traveler / Guest" : "Voyageur / Client"}
               </div>
@@ -186,7 +192,17 @@ export default function Register() {
                 textAlign: "center"
               }}
             >
-              <div style={{ fontSize: "1.3rem", marginBottom: "4px" }}>🏰</div>
+              <div style={{ marginBottom: "6px", display: "flex", justifyContent: "center" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={formData.role === "PROPRIETAIRE" ? "var(--terracotta)" : "var(--text-secondary)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>
+                  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
+                  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>
+                  <path d="M10 6h4"/>
+                  <path d="M10 10h4"/>
+                  <path d="M10 14h4"/>
+                  <path d="M10 18h4"/>
+                </svg>
+              </div>
               <div style={{ fontWeight: 800, fontSize: "0.88rem", color: formData.role === "PROPRIETAIRE" ? "var(--terracotta)" : "var(--text-primary)" }}>
                 {language === "en" ? "Riad Owner" : "Propriétaire"}
               </div>
