@@ -63,6 +63,7 @@ export default function Login() {
         nom: data.nom,
         prenom: data.prenom,
         email: data.email,
+        telephone: data.telephone || "",
         role: data.role,
         statut: data.statut
       }));

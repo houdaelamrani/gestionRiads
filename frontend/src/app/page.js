@@ -7,6 +7,7 @@ import { useLanguage } from "../lib/LanguageContext";
 import { getNotifications, markNotificationsAsRead, getUnreadCount } from "../lib/NotificationSystem";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import ChatbotWidget from "../components/ChatbotWidget";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
@@ -40,6 +41,49 @@ export default function Home() {
     updateNotifs();
     window.addEventListener("notifications_updated", updateNotifs);
     return () => window.removeEventListener("notifications_updated", updateNotifs);
+  }, []);
+
+  // Synchronisation automatique de la barre de navigation avec le scroll et le hash
+  useEffect(() => {
+    const handleScrollOrHash = () => {
+      if (typeof window === "undefined") return;
+
+      const hash = window.location.hash;
+      const servicesSection = document.getElementById("services") || document.getElementById("comment");
+      const riadsSection = document.getElementById("riads");
+
+      if (servicesSection) {
+        const servicesRect = servicesSection.getBoundingClientRect();
+        // Si l'utilisateur est dans la section services
+        if (servicesRect.top <= 250 && servicesRect.bottom >= 150) {
+          setActiveNavTab("services");
+          return;
+        }
+      }
+
+      if (hash === "#comment" || hash === "#services") {
+        setActiveNavTab("services");
+        return;
+      }
+
+      if (riadsSection) {
+        const riadsRect = riadsSection.getBoundingClientRect();
+        if (riadsRect.top <= 350) {
+          setActiveNavTab("riads");
+          return;
+        }
+      }
+
+      setActiveNavTab("riads");
+    };
+
+    handleScrollOrHash();
+    window.addEventListener("scroll", handleScrollOrHash, { passive: true });
+    window.addEventListener("hashchange", handleScrollOrHash);
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrHash);
+      window.removeEventListener("hashchange", handleScrollOrHash);
+    };
   }, []);
 
   // ── Charger les riads depuis l'API ────────────────────────────────────────
@@ -241,7 +285,7 @@ export default function Home() {
   return (
     <div>
       {/* 1. Navbar */}
-      <Navbar activeTab={activeNavTab} />
+      <Navbar activeTab={activeNavTab} onTabChange={setActiveNavTab} />
 
       {/* 2. Hero Section */}
       <header className="hero">
@@ -441,7 +485,7 @@ export default function Home() {
       {/* 4. Contenu Principal */}
       <main className="main-container">
         {/* Section Riads Disponibles */}
-        <section id="riads" style={{ padding: "40px 0 60px 0" }}>
+        <section id="riads" style={{ padding: "40px 0 60px 0", scrollMarginTop: "80px" }}>
           <div className="section-header" style={{ marginBottom: "24px" }}>
             <h2>{t("riads_title")}</h2>
             <p>
@@ -569,14 +613,9 @@ export default function Home() {
 
                       {/* Info Container */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                        {/* Title and Rating */}
+                        {/* Title */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                           <span style={{ fontWeight: 600, fontSize: "0.98rem", color: "var(--text-primary)" }}>{riad.nom}</span>
-                          {avisInfo.count > 0 && (
-                            <span style={{ fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "3px", color: "var(--text-primary)", flexShrink: 0 }}>
-                              ★ {avisInfo.moy}
-                            </span>
-                          )}
                         </div>
 
                         {/* Location */}
@@ -638,7 +677,8 @@ export default function Home() {
 
 
         {/* Section Services Premium */}
-        <section id="comment" style={{ padding: "40px 0 80px 0" }}>
+        <section id="services" style={{ padding: "40px 0 80px 0", scrollMarginTop: "80px" }}>
+          <span id="comment" style={{ display: "block", position: "relative", top: "-90px", visibility: "hidden" }}></span>
           <div className="section-header">
             <h2>{t("services_title")}</h2>
             <p>
@@ -778,6 +818,9 @@ export default function Home() {
 
       {/* 6. Footer */}
       <Footer onCityClick={handleCityFilter} />
+
+      {/* 7. Chatbot Bahia IA */}
+      <ChatbotWidget />
     </div>
   );
 }

@@ -1,11 +1,52 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "../lib/LanguageContext";
 import LogoIcon from "./LogoIcon";
 
-export default function Navbar({ activeTab = "" }) {
+export default function Navbar({ activeTab = "", onTabChange }) {
   const { language, setLanguage, t } = useLanguage();
+  const [hashTab, setHashTab] = useState("");
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      if (typeof window !== "undefined") {
+        const hash = window.location.hash;
+        if (hash === "#comment" || hash === "#services") {
+          setHashTab("services");
+          if (onTabChange) onTabChange("services");
+        } else if (hash === "#riads") {
+          setHashTab("riads");
+          if (onTabChange) onTabChange("riads");
+        }
+      }
+    };
+
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, [onTabChange]);
+
+  const currentTab = activeTab || hashTab || "riads";
+
+  const handleLinkClick = (tab, targetId, e) => {
+    setHashTab(tab);
+    if (onTabChange) onTabChange(tab);
+
+    if (typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "")) {
+      const el = document.getElementById(targetId) || 
+                 (targetId === "services" ? document.getElementById("comment") : document.getElementById("services"));
+      if (el) {
+        e.preventDefault();
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.history.pushState(null, "", `#${targetId}`);
+      }
+    }
+  };
+
+  const isRiadsActive = currentTab === "riads";
+  const isServicesActive = currentTab === "services";
 
   return (
     <header style={{
@@ -44,30 +85,32 @@ export default function Navbar({ activeTab = "" }) {
         <nav style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <Link
             href="/#riads"
+            onClick={(e) => handleLinkClick("riads", "riads", e)}
             style={{
               padding: "8px 18px",
               borderRadius: "20px",
               fontSize: "0.95rem",
-              fontWeight: 600,
+              fontWeight: isRiadsActive ? 700 : 600,
               textDecoration: "none",
-              transition: "all 0.2s ease",
-              color: activeTab === "riads" ? "var(--terracotta)" : "var(--text-primary)",
-              backgroundColor: activeTab === "riads" ? "rgba(217, 107, 67, 0.08)" : "transparent"
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              color: isRiadsActive ? "var(--terracotta)" : "var(--text-primary)",
+              backgroundColor: isRiadsActive ? "rgba(217, 107, 67, 0.1)" : "transparent"
             }}
           >
             {t("nav_riads")}
           </Link>
           <Link
-            href="/#comment"
+            href="/#services"
+            onClick={(e) => handleLinkClick("services", "services", e)}
             style={{
               padding: "8px 18px",
               borderRadius: "20px",
               fontSize: "0.95rem",
-              fontWeight: 600,
+              fontWeight: isServicesActive ? 700 : 600,
               textDecoration: "none",
-              transition: "all 0.2s ease",
-              color: activeTab === "services" ? "var(--terracotta)" : "var(--text-primary)",
-              backgroundColor: activeTab === "services" ? "rgba(217, 107, 67, 0.08)" : "transparent"
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              color: isServicesActive ? "var(--terracotta)" : "var(--text-primary)",
+              backgroundColor: isServicesActive ? "rgba(217, 107, 67, 0.1)" : "transparent"
             }}
           >
             {t("nav_services")}

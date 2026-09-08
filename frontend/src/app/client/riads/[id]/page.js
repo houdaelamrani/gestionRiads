@@ -73,14 +73,11 @@ export default function RiadDetailPage({ params }) {
       if (ci) setDateDebut(normalizeToIsoDate(ci));
       if (co) setDateFin(normalizeToIsoDate(co));
 
-      const savedEmail = localStorage.getItem("guest_email");
-      if (savedEmail) setGuestEmail(savedEmail);
-      const savedNom = localStorage.getItem("guest_nom");
-      if (savedNom) setGuestNom(savedNom);
-      const savedPrenom = localStorage.getItem("guest_prenom");
-      if (savedPrenom) setGuestPrenom(savedPrenom);
-      const savedPhone = localStorage.getItem("guest_phone");
-      if (savedPhone) setGuestPhone(savedPhone);
+      // Nettoyer les anciennes coordonnées pour que les champs restent vides par défaut
+      localStorage.removeItem("guest_email");
+      localStorage.removeItem("guest_nom");
+      localStorage.removeItem("guest_prenom");
+      localStorage.removeItem("guest_phone");
     }
 
     loadRiadAndRooms();
@@ -196,13 +193,17 @@ export default function RiadDetailPage({ params }) {
       return;
     }
 
-    if (isoDateDebut < todayStr) {
-      setBookingError(language === "en" ? "Check-in date cannot be in the past." : "La date d'arrivée ne peut pas être dans le passé.");
+    if (isoDateDebut <= todayStr) {
+      setBookingError(language === "en" 
+        ? "Check-in date cannot be today or in the past. Bookings must start at least from tomorrow." 
+        : "La date d'arrivée ne peut pas être aujourd'hui ou dans le passé. Les réservations doivent débuter au minimum à partir de demain.");
       return;
     }
 
     if (isoDateFin <= isoDateDebut) {
-      setBookingError(language === "en" ? "Check-out date must be after check-in date." : "La date de départ doit être postérieure à la date d'arrivée.");
+      setBookingError(language === "en" 
+        ? "Check-out date must be strictly after check-in date (at least 1 night)." 
+        : "La date de départ doit être strictement postérieure à la date d'arrivée (au minimum 1 nuit).");
       return;
     }
 
@@ -242,14 +243,6 @@ export default function RiadDetailPage({ params }) {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.message || (language === "en" ? "Failed to create reservation." : "Impossible d'effectuer la réservation."));
-      }
-
-      // Sauvegarder les informations de contact
-      if (typeof window !== "undefined") {
-        localStorage.setItem("guest_email", guestEmail.trim());
-        localStorage.setItem("guest_nom", guestNom.trim());
-        localStorage.setItem("guest_prenom", guestPrenom.trim());
-        localStorage.setItem("guest_phone", guestPhone.trim());
       }
 
       const bookedRoomName = getSelectedRoomName();
@@ -888,6 +881,7 @@ export default function RiadDetailPage({ params }) {
                         value={guestNom}
                         onChange={(e) => setGuestNom(e.target.value)}
                         required
+                        autoComplete="off"
                         style={{
                           width: "100%",
                           padding: "8px 10px",
@@ -908,6 +902,7 @@ export default function RiadDetailPage({ params }) {
                         value={guestPrenom}
                         onChange={(e) => setGuestPrenom(e.target.value)}
                         required
+                        autoComplete="off"
                         style={{
                           width: "100%",
                           padding: "8px 10px",
@@ -931,6 +926,7 @@ export default function RiadDetailPage({ params }) {
                         value={guestEmail}
                         onChange={(e) => setGuestEmail(e.target.value)}
                         required
+                        autoComplete="off"
                         style={{
                           width: "100%",
                           padding: "8px 10px",
@@ -951,6 +947,7 @@ export default function RiadDetailPage({ params }) {
                         value={guestPhone}
                         onChange={(e) => setGuestPhone(e.target.value)}
                         required
+                        autoComplete="off"
                         style={{
                           width: "100%",
                           padding: "8px 10px",

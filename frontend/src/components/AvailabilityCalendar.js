@@ -100,8 +100,9 @@ export default function AvailabilityCalendar({
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
       const isPast = dateStr < todayStr;
       const isToday = dateStr === todayStr;
+      const isPastOrToday = dateStr <= todayStr;
       const isUnavailable = Boolean(dateStatusMap[dateStr]);
-      const isDisabled = isPast || isUnavailable;
+      const isDisabled = isPastOrToday || isUnavailable;
 
       const isSelectedStart = startDate === dateStr && !isDisabled;
       const isSelectedEnd = endDate === dateStr && !isDisabled;

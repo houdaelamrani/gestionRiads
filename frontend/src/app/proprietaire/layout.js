@@ -10,7 +10,7 @@ function ProprietaireLayoutInner({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const currentTab = searchParams ? searchParams.get("tab") || "dashboard" : "dashboard";
 
   const [mounted, setMounted] = useState(false);
@@ -84,7 +84,7 @@ function ProprietaireLayoutInner({ children }) {
   };
 
   const currentHour = typeof window !== "undefined" ? new Date().getHours() : 12;
-  const greeting = currentHour >= 18 || currentHour < 5 ? "Bonsoir" : "Bonjour";
+  const greeting = currentHour >= 18 || currentHour < 5 ? t("owner_good_evening") : t("owner_good_morning");
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f8fafc", fontFamily: "'Outfit', sans-serif" }}>
@@ -214,7 +214,7 @@ function ProprietaireLayoutInner({ children }) {
           {/* Menu de Navigation */}
           <nav style={{ padding: "0 12px", marginTop: "12px" }}>
             <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", padding: "0 14px", marginBottom: "8px" }}>
-              GESTION ÉTABLISSEMENT
+              {t("owner_property_management")}
             </div>
 
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -242,7 +242,7 @@ function ProprietaireLayoutInner({ children }) {
                     <rect width="7" height="9" x="14" y="12" rx="1" />
                     <rect width="7" height="5" x="3" y="16" rx="1" />
                   </svg>
-                  Tableau de Bord
+                  {t("owner_dashboard")}
                 </Link>
               </li>
 
@@ -271,7 +271,7 @@ function ProprietaireLayoutInner({ children }) {
                     <line x1="16" y1="17" x2="8" y2="17" />
                     <polyline points="10 9 9 9 8 9" />
                   </svg>
-                  Réservations & Check-in
+                  {t("owner_reservations")}
                 </Link>
               </li>
 
@@ -299,7 +299,7 @@ function ProprietaireLayoutInner({ children }) {
                     <path d="M2 17h20" />
                     <path d="M6 8v9" />
                   </svg>
-                  Gestion des Chambres
+                  {t("owner_rooms")}
                 </Link>
               </li>
 
@@ -330,13 +330,13 @@ function ProprietaireLayoutInner({ children }) {
                     <path d="M10 14h4" />
                     <path d="M10 18h4" />
                   </svg>
-                  Gestion des Riads
+                  {t("owner_riads")}
                 </Link>
               </li>
 
               <li style={{ marginTop: "16px" }}>
                 <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", padding: "0 14px", marginBottom: "8px" }}>
-                  COMPTE & PARAMÈTRES
+                  {t("owner_account_settings")}
                 </div>
                 <Link
                   href="/proprietaire/dashboard?tab=parametres"
@@ -359,7 +359,7 @@ function ProprietaireLayoutInner({ children }) {
                     <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
-                  Profil & Paramètres
+                  {t("owner_profile_settings")}
                 </Link>
               </li>
             </ul>
@@ -432,7 +432,7 @@ function ProprietaireLayoutInner({ children }) {
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" x2="9" y1="12" y2="12" />
             </svg>
-            Déconnexion
+            {t("logout")}
           </button>
         </div>
       </aside>
@@ -459,14 +459,14 @@ function ProprietaireLayoutInner({ children }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Espace Propriétaire</span>
+            <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>{t("owner_space")}</span>
             <span style={{ color: "#cbd5e1" }}>/</span>
             <span style={{ fontSize: "0.88rem", color: "var(--terracotta, #d96b43)", fontWeight: 800, textTransform: "capitalize" }}>
-              {(currentTab === "dashboard" || currentTab === "historique") && "Tableau de Bord Opérationnel"}
-              {currentTab === "reservations" && "Gestion des Réservations & Check-in"}
-              {currentTab === "chambres" && "Gestion Complète des Chambres"}
-              {currentTab === "riad" && "Gestion des Riads"}
-              {currentTab === "parametres" && "Profil & Paramètres"}
+              {(currentTab === "dashboard" || currentTab === "historique") && t("owner_dashboard_title")}
+              {currentTab === "reservations" && t("owner_reservations")}
+              {currentTab === "chambres" && t("owner_rooms")}
+              {currentTab === "riad" && t("owner_riads")}
+              {currentTab === "parametres" && t("owner_profile_settings")}
             </span>
           </div>
 
@@ -478,7 +478,7 @@ function ProprietaireLayoutInner({ children }) {
                 <line x1="8" x2="8" y1="2" y2="6" />
                 <line x1="3" x2="21" y1="10" y2="10" />
               </svg>
-              {new Date().toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+              {new Date().toLocaleDateString(language === "en" ? "en-US" : "fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
         </header>

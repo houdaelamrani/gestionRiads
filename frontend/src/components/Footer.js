@@ -58,7 +58,7 @@ export default function Footer({ onCityClick }) {
               <Link href="/#riads">{t("nav_riads")}</Link>
             </li>
             <li>
-              <Link href="/#comment">{t("nav_services")}</Link>
+              <Link href="/#services">{t("nav_services")}</Link>
             </li>
           </ul>
         </div>

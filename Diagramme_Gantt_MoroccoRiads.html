@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning & Diagramme de Gantt - MoroccoRiads - EMSI 2025-2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #131b2e;
+      --border: #202d48;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --emsi-green: #10b981;
+      --emsi-green-dark: #059669;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 30px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1300px;
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 34px;
+      border: 1px solid var(--border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Top Academic Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+      gap: 20px;
+    }
+
+    .school-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .title-area h1 {
+      font-size: 23px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.3;
+      letter-spacing: -0.4px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13.5px;
+      margin-top: 5px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .subtitle span.tag {
+      background: #1e293b;
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 12px;
+    }
+
+    .btn-print {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      white-space: nowrap;
+    }
+
+    /* Meta Cards Grid */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .meta-card {
+      background: rgba(11, 15, 25, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .meta-card label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .meta-card val {
+      display: block;
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #f1f5f9;
+    }
+
+    .meta-card val.highlight-green { color: #34d399; }
+    .meta-card val.highlight-blue { color: #38bdf8; }
+    .meta-card val.highlight-orange { color: #fb923c; }
+
+    /* Gantt Table */
+    .gantt-card {
+      background: #0d1322;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 10px;
+      font-size: 12.5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      border-right: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    th {
+      background: #162035;
+      font-weight: 700;
+      color: #94a3b8;
+      font-size: 11.5px;
+      text-transform: uppercase;
+    }
+
+    th.col-task {
+      width: 320px;
+      text-align: left;
+      color: #f8fafc;
+      padding-left: 18px;
+    }
+
+    td.task-name {
+      font-weight: 700;
+      color: #f1f5f9;
+      padding-left: 18px;
+      font-size: 12.5px;
+    }
+
+    .month-header {
+      font-size: 12.5px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+    }
+
+    .month-jul { color: #38bdf8; background: #0c1a2e !important; }
+    .month-aug { color: #fbbf24; background: #261a0c !important; }
+
+    /* Gantt Visual Bars */
+    .bar-wrapper {
+      position: relative;
+      height: 30px;
+      display: flex;
+      align-items: center;
+    }
+
+    .bar {
+      height: 26px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10.5px;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+      position: absolute;
+      left: 3px; right: 3px;
+    }
+
+    .g-blue { background: linear-gradient(90deg, #2563eb, #38bdf8); }
+    .g-purple { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+    .g-emerald { background: linear-gradient(90deg, #059669, #34d399); }
+    .g-teal { background: linear-gradient(90deg, #0d9488, #2dd4bf); }
+    .g-orange { background: linear-gradient(90deg, #ea580c, #fb923c); }
+    .g-amber { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .g-indigo { background: linear-gradient(90deg, #4f46e5, #818cf8); }
+    .g-rose { background: linear-gradient(90deg, #e11d48, #f43f5e); }
+
+    /* Legend */
+    .legend-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 20px;
+      padding: 14px 18px;
+      background: rgba(11, 15, 25, 0.5);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    @media print {
+      body { background: white; color: black; padding: 0; }
+      .container { background: white; border: none; box-shadow: none; width: 100%; max-width: 100%; padding: 0; }
+      th, td { border-color: #cbd5e1; color: black; }
+      th { background: #f1f5f9; color: black; }
+      td.task-name { color: black; }
+      .btn-print { display: none; }
+      .meta-card { background: #f8fafc; border-color: #e2e8f0; }
+      .meta-card val { color: #0f172a !important; }
+      .school-badge { background: #e6f4ea; color: #137333; border-color: #ceead6; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="title-area">
+        <div class="school-badge">
+          🎓 EMSI — École Marocaine des Sciences de l'Ingénieur
+        </div>
+        <h1>
+          Conception & Réalisation d'une Application Web de Gestion des Riads
+        </h1>
+        <div class="subtitle">
+          <span><strong>Filière :</strong> Ingénierie Informatique et Réseaux</span>
+          <span>•</span>
+          <span><strong>Option :</strong> Développement Digital & Systèmes d'Information</span>
+          <span>•</span>
+          <span class="tag">Année 2025 - 2026</span>
+        </div>
+      </div>
+      <button class="btn-print" onclick="window.print()">🖨️ Exporter PDF</button>
+    </header>
+
+    <!-- Meta Information Cards -->
+    <div class="meta-grid">
+      <div class="meta-card">
+        <label>Réalisé par</label>
+        <val class="highlight-green">Houda El Amrani</val>
+      </div>
+      <div class="meta-card">
+        <label>Encadré par</label>
+        <val class="highlight-blue">Mr. Moulay Ismail Iroubi</val>
+      </div>
+      <div class="meta-card">
+        <label>Période du Projet</label>
+        <val class="highlight-orange">1 Juillet – 31 Août (2 Mois)</val>
+      </div>
+      <div class="meta-card">
+        <label>Année Universitaire</label>
+        <val>2025 – 2026</val>
+      </div>
+    </div>
+
+    <!-- Gantt Chart Table -->
+    <div class="gantt-card">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-task" rowspan="2">Phases & Tâches Principales</th>
+            <th colspan="4" class="month-header month-jul">MOIS 1 : JUILLET 2026 (S1 – S4)</th>
+            <th colspan="5" class="month-header month-aug">MOIS 2 : AOÛT 2026 (S5 – S9)</th>
+          </tr>
+          <tr>
+            <th style="width:70px;">S1<br><span style="font-size:9.5px;font-weight:normal;">1-7 Jul</span></th>
+            <th style="width:70px;">S2<br><span style="font-size:9.5px;font-weight:normal;">8-15 Jul</span></th>
+            <th style="width:70px;">S3<br><span style="font-size:9.5px;font-weight:normal;">16-22 Jul</span></th>
+            <th style="width:70px;">S4<br><span style="font-size:9.5px;font-weight:normal;">23-31 Jul</span></th>
+            <th style="width:70px;">S5<br><span style="font-size:9.5px;font-weight:normal;">1-7 Aug</span></th>
+            <th style="width:70px;">S6<br><span style="font-size:9.5px;font-weight:normal;">8-15 Aug</span></th>
+            <th style="width:70px;">S7<br><span style="font-size:9.5px;font-weight:normal;">16-22 Aug</span></th>
+            <th style="width:70px;">S8<br><span style="font-size:9.5px;font-weight:normal;">23-28 Aug</span></th>
+            <th style="width:70px;">S9<br><span style="font-size:9.5px;font-weight:normal;">29-31 Aug</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <!-- Task 1 -->
+          <tr>
+            <td class="task-name">1. Cadrage & Cahier des charges</td>
+            <td class="bar-wrapper"><div class="bar g-blue">1 - 7 Jul</div></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+          </tr>
+
+          <!-- Task 2 -->
+          <tr>
+            <td class="task-name">2. Modélisation UML & PostgreSQL</td>
+            <td></td>
+            <td colspan="2" class="bar-wrapper"><div class="bar g-purple">8 - 16 Jul</div></td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
+          </tr>
+
+          <!-- Task 3.1 -->
+          <tr>
+            <td class="task-name">3.1 Backend JPA & Spring Security</td>
+            <td></td><td></td>
+            <td colspan="2" class="bar-wrapper"><div class="bar g-emerald">17 - 31 Jul</div></td>
+            <td></td><td></td><td></td><td></td><td></td>
+          </tr>
+
+          <!-- Task 3.2 -->
+          <tr>
+            <td class="task-name">3.2 API REST (Riads) & Cloudinary</td>
+            <td></td><td></td><td></td>
+            <td colspan="2" class="bar-wrapper"><div class="bar g-teal">23 Jul - 6 Aug</div></td>
+            <td></td><td></td><td></td><td></td>
+          </tr>
+
+          <!-- Task 4.1 -->
+          <tr>
+            <td class="task-name">4.1 Frontend Client & Espace Hôte</td>
+            <td></td><td></td><td></td>
+            <td colspan="2" class="bar-wrapper"><div class="bar g-orange">27 Jul - 7 Aug</div></td>
+            <td></td><td></td><td></td><td></td>
+          </tr>
+
+          <!-- Task 4.2 -->
+          <tr>
+            <td class="task-name">4.2 Espace Admin & Intégration API</td>
+            <td></td><td></td><td></td><td></td>
+            <td colspan="2" class="bar-wrapper"><div class="bar g-amber">8 - 18 Aug</div></td>
+            <td></td><td></td><td></td>
+          </tr>
+
+          <!-- Task 5 -->
+          <tr>
+            <td class="task-name">5. Tests, Security Audit & Recette</td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
+            <td class="bar-wrapper"><div class="bar g-indigo">19 - 24 Aug</div></td>
+            <td></td><td></td>
+          </tr>
+
+          <!-- Task 6 -->
+          <tr>
+            <td class="task-name">6. Rédaction Rapport & Livrables</td>
+            <td></td><td></td><td></td><td></td><td></td><td></td>
+            <td colspan="2" class="bar-wrapper"><div class="bar g-rose">22 - 31 Aug</div></td>
+            <td></td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend-box">
+      <div class="legend-item"><span class="dot g-blue"></span> 1. Cadrage (1-7 Jul)</div>
+      <div class="legend-item"><span class="dot g-purple"></span> 2. Conception (8-16 Jul)</div>
+      <div class="legend-item"><span class="dot g-emerald"></span> 3. Backend Spring Boot (17 Jul - 6 Aug)</div>
+      <div class="legend-item"><span class="dot g-orange"></span> 4. Frontend Next.js (27 Jul - 18 Aug)</div>
+      <div class="legend-item"><span class="dot g-indigo"></span> 5. Tests & Recette (19-24 Aug)</div>
+      <div class="legend-item"><span class="dot g-rose"></span> 6. Rapport & Livrables (22-31 Aug)</div>
+    </div>
+
+  </div>
+
+</body>
+</html>

@@ -36,7 +36,7 @@ function ProprietaireDashboardInner() {
     prenom: "",
     email: "",
     telephone: "",
-    dateDebut: new Date().toISOString().split("T")[0],
+    dateDebut: new Date(Date.now() + 86400000).toISOString().split("T")[0],
     dateFin: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
     methodePaiement: "SUR_PLACE"
   });
@@ -164,6 +164,24 @@ function ProprietaireDashboardInner() {
 
   const loadOwnerData = async (ownerId, keepSelectedId = null) => {
     try {
+      try {
+        const resUser = await fetch(`${API_BASE}/api/utilisateurs/${ownerId}`, {
+          headers: { "X-User-Id": ownerId }
+        });
+        if (resUser.ok) {
+          const freshUser = await resUser.json();
+          setUser(freshUser);
+          setProfileForm((prev) => ({
+            ...prev,
+            nom: freshUser.nom || prev.nom || "",
+            prenom: freshUser.prenom || prev.prenom || "",
+            email: freshUser.email || prev.email || "",
+            telephone: freshUser.telephone || ""
+          }));
+          localStorage.setItem("user", JSON.stringify(freshUser));
+        }
+      } catch (e) {}
+
       let dataRiads = [];
       const resRiads = await fetch(`${API_BASE}/api/riads/owner`, {
         headers: { "X-User-Id": ownerId }
@@ -684,6 +702,15 @@ function ProprietaireDashboardInner() {
       alert("Veuillez sélectionner au moins une chambre.");
       return;
     }
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (directBookingForm.dateDebut <= todayStr) {
+      alert("La date d'arrivée ne peut pas être aujourd'hui ou dans le passé. Les réservations doivent débuter au minimum à partir de demain.");
+      return;
+    }
+    if (directBookingForm.dateFin <= directBookingForm.dateDebut) {
+      alert("La date de départ doit être strictement postérieure à la date d'arrivée (au minimum 1 nuit de séjour).");
+      return;
+    }
     setIsSubmittingDirectBooking(true);
     try {
       const payload = {
@@ -800,26 +827,26 @@ function ProprietaireDashboardInner() {
     .filter((r) => r.statut === "CONFIRMEE")
     .reduce((sum, r) => sum + (r.prixTotal || 0), 0);
 
-  const confirmedReservationsCount = filteredReservations.filter((r) => r.statut === "CONFIRMEE").length;
-  const totalChambresCount = chambres.length > 0 ? chambres.length : (riads.length * 3 || 1);
-  const tauxOccupation = Math.min(100, Math.max(0, Math.round((confirmedReservationsCount / Math.max(1, totalChambresCount)) * 100)));
+
 
   // Calcul des 7 jours du planning hebdomadaire
   const getWeekDays = () => {
     const days = [];
     const base = new Date();
     base.setDate(base.getDate() + scheduleOffset);
+    const locale = language === "en" ? "en-US" : "fr-FR";
     for (let i = 0; i < 7; i++) {
       const d = new Date(base);
       d.setDate(d.getDate() + i);
       const iso = d.toISOString().split("T")[0];
-      const dayName = d.toLocaleDateString("fr-FR", { weekday: "short" });
+      const dayName = d.toLocaleDateString(locale, { weekday: "short" });
       const dayNumber = d.getDate();
-      const monthName = d.toLocaleDateString("fr-FR", { month: "short" });
+      const monthName = d.toLocaleDateString(locale, { month: "short" });
       const isToday = iso === new Date().toISOString().split("T")[0];
       days.push({
         iso,
         dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
+        dayNum: dayNumber,
         dayNumber,
         monthName,
         isToday,
@@ -872,7 +899,7 @@ function ProprietaireDashboardInner() {
           {/* Header */}
           <div style={{ marginBottom: "24px" }}>
             <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0, letterSpacing: "-0.3px" }}>
-              Tableau de Bord
+              {t("owner_dashboard")}
             </h1>
           </div>
 
@@ -881,7 +908,7 @@ function ProprietaireDashboardInner() {
             {/* 1. Établissements */}
             <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid var(--terracotta, #d96b43)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Établissements</div>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("owner_kpi_riads")}</div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta, #d96b43)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
                   <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
@@ -889,14 +916,14 @@ function ProprietaireDashboardInner() {
                 </svg>
               </div>
               <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
-                {filteredRiads.length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Riad(s)</span>
+                {filteredRiads.length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>{t("owner_riads_unit")}</span>
               </div>
             </div>
 
             {/* 2. Capacité */}
             <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #0284c7" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Capacité Totale</div>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("owner_kpi_rooms")}</div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 4v16" />
                   <path d="M2 8h18a2 2 0 0 1 2 2v10" />
@@ -904,44 +931,29 @@ function ProprietaireDashboardInner() {
                 </svg>
               </div>
               <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
-                {chambres.length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Chambres</span>
+                {chambres.length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>{t("owner_room_unit")}</span>
               </div>
             </div>
 
-            {/* 3. Taux d'Occupation */}
-            <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #10b981" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Taux d'Occupation</div>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#10b981", backgroundColor: "#dcfce7", padding: "2px 8px", borderRadius: "10px" }}>Actif</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: "8px" }}>
-                <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a" }}>
-                  {tauxOccupation}%
-                </div>
-                <div style={{ width: "45px", height: "6px", backgroundColor: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
-                  <div style={{ width: `${tauxOccupation}%`, height: "100%", backgroundColor: "#10b981" }} />
-                </div>
-              </div>
-            </div>
 
             {/* 4. Séjours Confirmés */}
             <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #06b6d4" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Séjours Confirmés</div>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("owner_kpi_confirmed")}</div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
               </div>
               <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#0f172a", marginTop: "8px" }}>
-                {filteredReservations.filter((r) => r.statut === "CONFIRMEE").length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Séjour(s)</span>
+                {filteredReservations.filter((r) => r.statut === "CONFIRMEE").length} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>{t("owner_stay_unit")}</span>
               </div>
             </div>
 
             {/* 5. Chiffre d'Affaires */}
             <div style={{ backgroundColor: "#ffffff", padding: "20px 22px", borderRadius: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", borderTop: "4px solid #8b5cf6" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>Chiffre d'Affaires</div>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("owner_kpi_revenue")}</div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect width="20" height="14" x="2" y="5" rx="2" />
                   <line x1="2" x2="22" y1="10" y2="10" />
@@ -985,7 +997,7 @@ function ProprietaireDashboardInner() {
                       <line x1="8" x2="8" y1="2" y2="6" />
                       <line x1="3" x2="21" y1="10" y2="10" />
                     </svg>
-                    Planning des Disponibilités (Semaine)
+                    {t("owner_planning_title")}
                   </h2>
                   {riads.length > 1 ? (
                     <select
@@ -1049,7 +1061,7 @@ function ProprietaireDashboardInner() {
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                  Précédent
+                  {t("owner_btn_prev")}
                 </button>
 
                 <button
@@ -1066,7 +1078,7 @@ function ProprietaireDashboardInner() {
                     cursor: "pointer"
                   }}
                 >
-                  Aujourd'hui
+                  {t("owner_btn_today")}
                 </button>
 
                 <button
@@ -1086,7 +1098,7 @@ function ProprietaireDashboardInner() {
                     gap: "6px"
                   }}
                 >
-                  Suivant
+                  {t("owner_btn_next")}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
               </div>
@@ -1095,7 +1107,7 @@ function ProprietaireDashboardInner() {
             {/* Matrice des Disponibilités : Chambres x 7 Jours */}
             {chambres.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 20px", color: "#64748b" }}>
-                <p style={{ margin: 0, fontWeight: 700 }}>Aucune chambre configurée pour ce Riad.</p>
+                <p style={{ margin: 0, fontWeight: 700 }}>{t("owner_no_rooms")}</p>
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
@@ -1103,7 +1115,7 @@ function ProprietaireDashboardInner() {
                   <thead>
                     <tr>
                       <th style={{ textAlign: "left", padding: "10px 14px", color: "#64748b", fontWeight: 800, fontSize: "0.78rem", textTransform: "uppercase", width: "190px" }}>
-                        Chambres ({chambres.length})
+                        {t("owner_rooms")} ({chambres.length})
                       </th>
                       {weekDays.map((d, idx) => {
                         const isToday = d.iso === new Date().toISOString().split("T")[0];
@@ -1146,6 +1158,34 @@ function ProprietaireDashboardInner() {
                           const clientName = isOccupied
                             ? (booking.clientPrenom || booking.client?.prenom || "") + " " + (booking.clientNom || booking.client?.nom || "Invité")
                             : "";
+                          const isPast = d.iso < todayStr;
+                          const isToday = d.iso === todayStr;
+
+                          let cellBg = "#f0fdf4";
+                          let cellBorder = "1px solid #bbf7d0";
+                          let cellCursor = "pointer";
+
+                          if (isOccupied) {
+                            cellBg = isCheckInDay ? "#fef3c7" : "#fee2e2";
+                            cellBorder = isCheckInDay ? "1.5px solid #fde68a" : "1.5px solid #fca5a5";
+                            cellCursor = "pointer";
+                          } else if (isPast) {
+                            cellBg = "#f1f5f9";
+                            cellBorder = "1px solid #e2e8f0";
+                            cellCursor = "not-allowed";
+                          } else if (isToday) {
+                            cellBg = "#f8fafc";
+                            cellBorder = "1.5px dashed #cbd5e1";
+                            cellCursor = "not-allowed";
+                          }
+
+                          const cellTitle = isOccupied
+                            ? `${t("owner_room_status_occupied")} ${clientName.trim()} (${booking.prixTotal} MAD)`
+                            : isPast
+                              ? t("owner_room_past")
+                              : isToday
+                                ? t("owner_room_today_closed")
+                                : `${t("owner_room_free")} (${c.prixParNuit} MAD)`;
 
                           return (
                             <td
@@ -1153,6 +1193,10 @@ function ProprietaireDashboardInner() {
                               onClick={() => {
                                 if (isOccupied) {
                                   setSelectedScheduleReservation(booking);
+                                } else if (isPast) {
+                                  showToast(language === "en" ? "⚠️ Cannot book for a past date." : "⚠️ Impossible de réserver pour une date passée.");
+                                } else if (isToday) {
+                                  showToast(language === "en" ? "⚠️ Same-day booking is closed. Bookings must start tomorrow at earliest (D+1)." : "⚠️ Impossible de réserver le jour même. Les réservations doivent débuter au minimum demain (J+1).");
                                 } else {
                                   setDirectBookingForm({
                                     riadId: selectedRiad?.id || (riads[0]?.id || ""),
@@ -1173,25 +1217,14 @@ function ProprietaireDashboardInner() {
                                 textAlign: "center",
                                 padding: "10px 6px",
                                 borderRadius: "12px",
-                                cursor: "pointer",
+                                cursor: cellCursor,
                                 transition: "all 0.2s ease",
-                                backgroundColor: isOccupied
-                                  ? isCheckInDay
-                                    ? "#fef3c7"
-                                    : "#fee2e2"
-                                  : "#f0fdf4",
-                                border: isOccupied
-                                  ? isCheckInDay
-                                    ? "1.5px solid #fde68a"
-                                    : "1.5px solid #fca5a5"
-                                  : "1px solid #bbf7d0",
-                                verticalAlign: "middle"
+                                backgroundColor: cellBg,
+                                border: cellBorder,
+                                verticalAlign: "middle",
+                                opacity: (!isOccupied && isPast) ? 0.6 : 1
                               }}
-                              title={
-                                isOccupied
-                                  ? `Occupée par ${clientName.trim()} (${booking.prixTotal} MAD) - Cliquer pour détails`
-                                  : `Libre (${c.prixParNuit} MAD) - Cliquer pour réservation directe`
-                              }
+                              title={cellTitle}
                             >
                               {isOccupied ? (
                                 <div>
@@ -1222,14 +1255,34 @@ function ProprietaireDashboardInner() {
                                       marginTop: "2px"
                                     }}
                                   >
-                                    {isCheckInDay ? "Arrivée" : "Occupé"}
+                                    {isCheckInDay ? t("owner_room_arrival") : t("owner_room_occupied")}
+                                  </div>
+                                </div>
+                              ) : isPast ? (
+                                <div>
+                                  <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#cbd5e1", display: "inline-block" }} />
+                                    {t("owner_room_past")}
+                                  </div>
+                                  <div style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600, marginTop: "2px" }}>
+                                    {t("owner_room_past")}
+                                  </div>
+                                </div>
+                              ) : isToday ? (
+                                <div>
+                                  <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#94a3b8", display: "inline-block" }} />
+                                    {t("owner_btn_today")}
+                                  </div>
+                                  <div style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 700, marginTop: "2px" }}>
+                                    {t("owner_room_today_closed")}
                                   </div>
                                 </div>
                               ) : (
                                 <div>
                                   <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#15803d", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                                     <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#16a34a", display: "inline-block" }} />
-                                    Libre
+                                    {t("owner_room_free")}
                                   </div>
                                   <div style={{ fontSize: "0.65rem", color: "#16a34a", fontWeight: 600, marginTop: "2px" }}>
                                     {c.prixParNuit} MAD
@@ -1262,15 +1315,15 @@ function ProprietaireDashboardInner() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#16a34a", display: "inline-block" }} />
-                <span>Chambre Libre (Cliquer pour réserver)</span>
+                <span>{t("owner_legend_free")}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#dc2626", display: "inline-block" }} />
-                <span>Chambre Occupée (Cliquer pour détails)</span>
+                <span>{t("owner_legend_occupied")}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#d97706", display: "inline-block" }} />
-                <span>Arrivée / Check-in prévu ce jour</span>
+                <span>{t("owner_legend_arrival")}</span>
               </div>
             </div>
           </section>
@@ -1305,7 +1358,7 @@ function ProprietaireDashboardInner() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "8px" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Détails de la Réservation
+                {t("owner_booking_details")}
               </div>
               <button
                 type="button"
@@ -1319,28 +1372,28 @@ function ProprietaireDashboardInner() {
             <div style={{ backgroundColor: "#f8fafc", borderRadius: "12px", padding: "16px", marginBottom: "16px", border: "1px solid #e2e8f0" }}>
               <div style={{ fontWeight: 800, fontSize: "1rem", color: "#0f172a", display: "flex", alignItems: "center", gap: "6px" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {(selectedScheduleReservation.clientPrenom || selectedScheduleReservation.client?.prenom || "") + " " + (selectedScheduleReservation.clientNom || selectedScheduleReservation.client?.nom || "Client Invité")}
+                {(selectedScheduleReservation.clientPrenom || selectedScheduleReservation.client?.prenom || "") + " " + (selectedScheduleReservation.clientNom || selectedScheduleReservation.client?.nom || "Client")}
               </div>
               <div style={{ color: "#475569", fontSize: "0.82rem", marginTop: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                {selectedScheduleReservation.clientTelephone || selectedScheduleReservation.client?.telephone || "Non renseigné"}
+                {selectedScheduleReservation.clientTelephone || selectedScheduleReservation.client?.telephone || "N/A"}
               </div>
               <div style={{ color: "#475569", fontSize: "0.82rem", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                {selectedScheduleReservation.clientEmail || selectedScheduleReservation.client?.email || "Non renseigné"}
+                {selectedScheduleReservation.clientEmail || selectedScheduleReservation.client?.email || "N/A"}
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "18px", fontSize: "0.85rem" }}>
               <div style={{ backgroundColor: "#f1f5f9", padding: "10px", borderRadius: "8px" }}>
-                <div style={{ color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>DATES DU SÉJOUR</div>
+                <div style={{ color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>{t("owner_stay_dates")}</div>
                 <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>
-                  {selectedScheduleReservation.dateDebut} au {selectedScheduleReservation.dateFin}
+                  {t("from")} {selectedScheduleReservation.dateDebut} {t("to")} {selectedScheduleReservation.dateFin}
                 </div>
               </div>
 
               <div style={{ backgroundColor: "#f1f5f9", padding: "10px", borderRadius: "8px" }}>
-                <div style={{ color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>MONTANT TOTAL</div>
+                <div style={{ color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>{t("owner_total_amount")}</div>
                 <div style={{ fontWeight: 800, color: "var(--terracotta, #d96b43)", marginTop: "2px" }}>
                   {selectedScheduleReservation.prixTotal} MAD
                 </div>
@@ -1373,7 +1426,7 @@ function ProprietaireDashboardInner() {
                   }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  Effectuer le Check-in
+                  {t("owner_do_checkin")}
                 </button>
               ) : (
                 <button
@@ -1400,7 +1453,7 @@ function ProprietaireDashboardInner() {
                   }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  Voir Fiche de Police
+                  {t("owner_view_police_sheet")}
                 </button>
               )}
 
@@ -1418,7 +1471,7 @@ function ProprietaireDashboardInner() {
                   fontSize: "0.85rem"
                 }}
               >
-                Fermer
+                {t("owner_close")}
               </button>
             </div>
           </div>
@@ -1432,13 +1485,15 @@ function ProprietaireDashboardInner() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
             <div>
               <h1 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                Gestion des Réservations & Check-in
+                {t("owner_reservations_mgmt")}
               </h1>
             </div>
 
             <button
               type="button"
               onClick={() => {
+                const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+                const afterTomorrowStr = new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0];
                 setDirectBookingForm({
                   riadId: selectedRiad?.id || (riads[0]?.id || ""),
                   chambreId: chambres[0]?.id || "",
@@ -1447,8 +1502,8 @@ function ProprietaireDashboardInner() {
                   prenom: "",
                   email: "",
                   telephone: "",
-                  dateDebut: new Date().toISOString().split("T")[0],
-                  dateFin: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+                  dateDebut: tomorrowStr,
+                  dateFin: afterTomorrowStr,
                   methodePaiement: "SUR_PLACE"
                 });
                 setShowDirectBookingModal(true);
@@ -1469,7 +1524,7 @@ function ProprietaireDashboardInner() {
               }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nouvelle Réservation Directe
+              {t("owner_new_direct_booking")}
             </button>
           </div>
 
@@ -1478,11 +1533,11 @@ function ProprietaireDashboardInner() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px", flexWrap: "wrap", gap: "16px" }}>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {[
-                  { label: "Toutes", value: "TOUTES", count: filteredReservations.length },
-                  { label: "En Attente", value: "EN_ATTENTE", count: filteredReservations.filter((r) => r.statut === "EN_ATTENTE").length, dotColor: "#ef4444" },
-                  { label: "Arrivées du Jour", value: "ARRIVEES", count: filteredAlertesArrivees.length, dotColor: "#0284c7" },
-                  { label: "Confirmées", value: "CONFIRMEE", count: filteredReservations.filter((r) => r.statut === "CONFIRMEE").length, dotColor: "#10b981" },
-                  { label: "Refusées", value: "REFUSEE", count: filteredReservations.filter((r) => r.statut === "REFUSEE").length, dotColor: "#94a3b8" }
+                  { label: t("owner_filter_all"), value: "TOUTES", count: filteredReservations.length },
+                  { label: t("owner_filter_pending"), value: "EN_ATTENTE", count: filteredReservations.filter((r) => r.statut === "EN_ATTENTE").length, dotColor: "#ef4444" },
+                  { label: t("owner_filter_arrivals"), value: "ARRIVEES", count: filteredAlertesArrivees.length, dotColor: "#0284c7" },
+                  { label: t("owner_filter_confirmed"), value: "CONFIRMEE", count: filteredReservations.filter((r) => r.statut === "CONFIRMEE").length, dotColor: "#10b981" },
+                  { label: t("owner_filter_refused"), value: "REFUSEE", count: filteredReservations.filter((r) => r.statut === "REFUSEE").length, dotColor: "#94a3b8" }
                 ].map((f) => {
                   const isActive = reservationFilter === f.value;
                   return (
@@ -1531,20 +1586,20 @@ function ProprietaireDashboardInner() {
                 <div style={{ marginBottom: "8px" }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto" }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 </div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem" }}>Aucune réservation trouvée pour ce filtre.</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem" }}>{t("owner_no_res_filter")}</p>
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #f1f5f9", color: "#64748b" }}>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>ID Réservation</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Client & Contact</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Dates Séjour</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Montant</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Statut</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>Check-in Client</th>
-                      <th style={{ padding: "12px 10px", fontWeight: 800, textAlign: "right" }}>Actions Opérationnelles</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>{t("owner_th_id")}</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>{t("owner_th_client")}</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>{t("owner_th_dates")}</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>{t("owner_th_amount")}</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>{t("owner_th_status")}</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800 }}>{t("owner_th_checkin")}</th>
+                      <th style={{ padding: "12px 10px", fontWeight: 800, textAlign: "right" }}>{t("owner_th_actions")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1562,7 +1617,7 @@ function ProprietaireDashboardInner() {
                             <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{r.clientTelephone || r.client?.telephone || r.clientEmail || r.client?.email || ""}</div>
                           </td>
                           <td style={{ padding: "14px 10px", color: "#475569", fontSize: "0.82rem" }}>
-                            Du {r.dateDebut} au {r.dateFin}
+                            {t("from")} {r.dateDebut} {t("to")} {r.dateFin}
                           </td>
                           <td style={{ padding: "14px 10px", fontWeight: 800, color: "#0f172a" }}>
                             {r.prixTotal} MAD
@@ -1580,7 +1635,13 @@ function ProprietaireDashboardInner() {
                                   r.statut === "CONFIRMEE" ? "#15803d" : r.statut === "REFUSEE" ? "#991b1b" : "#b45309"
                               }}
                             >
-                              {r.statut}
+                              {r.statut === "CONFIRMEE"
+                                ? t("status_confirmed")
+                                : r.statut === "REFUSEE"
+                                ? t("status_refused")
+                                : r.statut === "ANNULEE"
+                                ? t("status_cancelled")
+                                : t("status_pending")}
                             </span>
                           </td>
                           <td style={{ padding: "14px 10px" }}>
@@ -1598,7 +1659,7 @@ function ProprietaireDashboardInner() {
                                   gap: "4px"
                                 }}
                               >
-                                ✓ Effectué {r.clientNumeroPieceIdentite ? `(${r.clientNumeroPieceIdentite})` : ""}
+                                ✓ {t("owner_done")} {r.clientNumeroPieceIdentite ? `(${r.clientNumeroPieceIdentite})` : ""}
                               </span>
                             ) : (
                               <span
@@ -1611,7 +1672,7 @@ function ProprietaireDashboardInner() {
                                   color: "#64748b"
                                 }}
                               >
-                                Non effectué
+                                {t("owner_not_done")}
                               </span>
                             )}
                           </td>
@@ -1635,7 +1696,7 @@ function ProprietaireDashboardInner() {
                                     gap: "6px",
                                     boxShadow: "0 2px 8px rgba(217, 107, 67, 0.25)"
                                   }}
-                                  title="Enregistrer les informations d'identité du client pour le check-in"
+                                  title={language === "en" ? "Register guest legal ID for check-in" : "Enregistrer les informations d'identité du client pour le check-in"}
                                 >
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                                   Check-in
@@ -1659,10 +1720,10 @@ function ProprietaireDashboardInner() {
                                     alignItems: "center",
                                     gap: "6px"
                                   }}
-                                  title="Consulter ou imprimer la fiche de police / check-in"
+                                  title={language === "en" ? "View or print guest police sheet / voucher" : "Consulter ou imprimer la fiche de police / check-in"}
                                 >
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                  Fiche
+                                  {t("owner_btn_sheet")}
                                 </button>
                               )}
 
@@ -1672,7 +1733,7 @@ function ProprietaireDashboardInner() {
                                   onClick={() => handleUpdateReservationStatus(r.id, "REFUSEE")}
                                   style={{ backgroundColor: "#ef4444", color: "#ffffff", border: "none", borderRadius: "8px", padding: "6px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
                                 >
-                                  Refuser
+                                  {t("owner_btn_refuse")}
                                 </button>
                               )}
                             </div>
@@ -1694,7 +1755,7 @@ function ProprietaireDashboardInner() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
               <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                Gestion des Chambres
+                {t("owner_rooms")}
               </h2>
               {riads.length > 1 && (
                 <select
@@ -1741,7 +1802,7 @@ function ProprietaireDashboardInner() {
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Ajouter une chambre
+              {t("owner_add_room")}
             </button>
           </div>
 
@@ -1809,10 +1870,10 @@ function ProprietaireDashboardInner() {
                         }}
                       />
                       {ch.statut === "OCCUPEE"
-                        ? "Occupée"
+                        ? t("owner_room_status_occupied")
                         : ch.statut === "RESERVEE"
-                        ? "Réservée (Sur place)"
-                        : "Disponible"}
+                        ? t("owner_room_status_reserved")
+                        : t("owner_room_status_available")}
                     </span>
                   </div>
 
@@ -1822,22 +1883,30 @@ function ProprietaireDashboardInner() {
                     </h3>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "14px" }}>
                       <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>
-                        {ch.typeChambre}
+                        {ch.typeChambre === "SIMPLE"
+                          ? t("owner_room_type_simple")
+                          : ch.typeChambre === "DOUBLE"
+                          ? t("owner_room_type_double")
+                          : ch.typeChambre === "SUITE"
+                          ? t("owner_room_type_suite")
+                          : ch.typeChambre === "FAMILIALE"
+                          ? t("owner_room_type_familiale")
+                          : ch.typeChambre}
                       </span>
                       <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>•</span>
                       <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>
-                        {ch.capacite} pers.
+                        {ch.capacite} {t("owner_room_pers")}
                       </span>
                     </div>
 
                     <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--primary-dark)" }}>
-                      {ch.prixParNuit} <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>MAD / nuit</span>
+                      {ch.prixParNuit} <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 600 }}>MAD / {t("per_night")}</span>
                     </div>
 
                     {/* Sélecteur des 3 États de la Chambre */}
                     <div style={{ marginTop: "14px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
                       <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                        État actuel :
+                        {t("owner_room_current_state")}
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
                         <button
@@ -1859,7 +1928,7 @@ function ProprietaireDashboardInner() {
                           }}
                         >
                           <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#16a34a" }} />
-                          Dispo
+                          {t("owner_room_free")}
                         </button>
                         <button
                           type="button"
@@ -1880,7 +1949,7 @@ function ProprietaireDashboardInner() {
                           }}
                         >
                           <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#d97706" }} />
-                          Réservée
+                          {language === "en" ? "Reserved" : "Réservée"}
                         </button>
                         <button
                           type="button"
@@ -1901,7 +1970,7 @@ function ProprietaireDashboardInner() {
                           }}
                         >
                           <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#dc2626" }} />
-                          Occupée
+                          {t("owner_room_occupied")}
                         </button>
                       </div>
                     </div>
@@ -1933,7 +2002,7 @@ function ProprietaireDashboardInner() {
                       }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                      Modifier
+                      {t("owner_btn_edit")}
                     </button>
                     <button
                       onClick={() => handleToggleRoomDispo(ch)}
@@ -1954,7 +2023,7 @@ function ProprietaireDashboardInner() {
                       }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                      {ch.disponible ? "Masquer" : "Publier"}
+                      {ch.disponible ? t("owner_btn_hide") : t("owner_btn_publish")}
                     </button>
                   </div>
 
@@ -1977,7 +2046,7 @@ function ProprietaireDashboardInner() {
                     }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    Supprimer la Chambre
+                    {t("owner_btn_delete_room")}
                   </button>
                 </div>
               </div>
@@ -2005,7 +2074,7 @@ function ProprietaireDashboardInner() {
           >
             <div>
               <h2 style={{ fontSize: "1.4rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-                Gestion des Riads
+                {t("owner_riads")}
               </h2>
             </div>
 
@@ -2043,15 +2112,15 @@ function ProprietaireDashboardInner() {
             <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
               <div style={{ backgroundColor: "#ffffff", padding: "28px", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                  <h4 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>Fiche Riad</h4>
+                  <h4 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>{t("owner_riad_sheet")}</h4>
                   <button type="submit" disabled={isSavingRiad} style={{ backgroundColor: "var(--terracotta)", color: "#ffffff", border: "none", padding: "8px 18px", borderRadius: "8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    {isSavingRiad ? "Enregistrement..." : "Enregistrer"}
+                    {isSavingRiad ? (language === "en" ? "Saving..." : "Enregistrement...") : t("owner_save")}
                   </button>
                 </div>
 
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Nom du Riad *</label>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>{t("owner_riad_name")} *</label>
                   <input
                     type="text"
                     required
@@ -2062,7 +2131,7 @@ function ProprietaireDashboardInner() {
                 </div>
 
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Adresse dans la Médina *</label>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>{t("owner_riad_address")} *</label>
                   <input
                     type="text"
                     required
@@ -2074,7 +2143,7 @@ function ProprietaireDashboardInner() {
 
                 <div style={{ marginBottom: "18px" }}>
                   <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>
-                    Changer la photo du Riad (depuis votre disque local)
+                    {language === "en" ? "Change Riad photo (from local disk)" : "Changer la photo du Riad (depuis votre disque local)"}
                   </label>
                   <div style={{ display: "flex", gap: "14px", alignItems: "center", backgroundColor: "#f8fafc", padding: "12px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
                     {(editRiadFilePreview || services.photoUrl) && (
@@ -2101,40 +2170,41 @@ function ProprietaireDashboardInner() {
                 </div>
 
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Description commerciale *</label>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>{t("owner_commercial_desc")} *</label>
                   <textarea rows={5} value={services.description} onChange={(e) => setServices({ ...services, description: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.88rem", fontFamily: "inherit" }} />
                 </div>
 
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>Tarif Privatisation Riad Entier (MAD / nuit)</label>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", color: "#0f172a", marginBottom: "6px" }}>{t("owner_privatization_price")}</label>
                   <input type="number" value={services.prixRiadEntier} onChange={(e) => setServices({ ...services, prixRiadEntier: parseFloat(e.target.value) || 0 })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.95rem" }} />
                 </div>
               </div>
 
               <div style={{ backgroundColor: "#f8fafc", padding: "24px", borderRadius: "14px", border: "1px solid #e2e8f0", height: "fit-content" }}>
-                <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0" }}>Services Proposés aux Voyageurs</h4>
+                <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0" }}>{t("owner_offered_services")}</h4>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e2e8f0" }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Service Spa & Massage</div>
-                    <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Espace bien-être et soins de relaxation</div>
+                    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>{t("service_spa_title")}</div>
+                    <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>{t("service_spa_desc")}</div>
                   </div>
                   <input type="checkbox" checked={services.hasSpa} onChange={(e) => setServices({ ...services, hasSpa: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta)" }} />
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e2e8f0" }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Hammam Traditionnel Marocain</div>
-                    <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Bain de vapeur et gommage traditionnel</div>
+                    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>{t("service_hammam_title")}</div>
+                    <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>{t("service_hammam_desc")}</div>
                   </div>
                   <input type="checkbox" checked={services.hasHammam} onChange={(e) => setServices({ ...services, hasHammam: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta)" }} />
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>Table d'Hôte & Service Traiteur</div>
-                    <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>Petits-déjeuners et dîners traditionnels</div>
+                    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f172a" }}>{t("service_traiteur_title")}</div>
+                    <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>{t("service_traiteur_desc")}</div>
                   </div>
+                  <input type="checkbox" checked={services.hasTraiteur} onChange={(e) => setServices({ ...services, hasTraiteur: e.target.checked })} style={{ width: "20px", height: "20px", cursor: "pointer", accentColor: "var(--terracotta)" }} />
                 </div>
               </div>
             </div>
@@ -2147,14 +2217,14 @@ function ProprietaireDashboardInner() {
         <div style={{ backgroundColor: "#ffffff", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(0,0,0,0.04)", border: "1px solid #e2e8f0", maxWidth: "680px", margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: "28px" }}>
             <h2 style={{ fontSize: "1.6rem", color: "#0f172a", fontWeight: 800, margin: 0 }}>
-              Paramètres du Profil
+              {t("owner_profile_settings")}
             </h2>
           </div>
 
           <form onSubmit={handleUpdateProfile}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "18px" }}>
               <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Nom</label>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>{t("register_nom")}</label>
                 <input
                   type="text"
                   required
@@ -2164,7 +2234,7 @@ function ProprietaireDashboardInner() {
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Prénom</label>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>{t("register_prenom")}</label>
                 <input
                   type="text"
                   required
@@ -2176,9 +2246,11 @@ function ProprietaireDashboardInner() {
             </div>
 
             <div style={{ marginBottom: "18px" }}>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Email Gérant</label>
+              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>{t("owner_manager_email")}</label>
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 disabled
                 value={profileForm.email}
                 style={{ width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", color: "#64748b", fontSize: "0.92rem", fontWeight: 600 }}
@@ -2186,9 +2258,11 @@ function ProprietaireDashboardInner() {
             </div>
 
             <div style={{ marginBottom: "22px" }}>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Numéro de Téléphone</label>
+              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>{t("guest_phone")}</label>
               <input
-                type="text"
+                type="tel"
+                name="telephone"
+                autoComplete="tel"
                 placeholder="+212 600-000000"
                 value={profileForm.telephone}
                 onChange={(e) => setProfileForm({ ...profileForm, telephone: e.target.value })}
@@ -2197,12 +2271,14 @@ function ProprietaireDashboardInner() {
             </div>
 
             <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "24px", marginTop: "24px" }}>
-              <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>Sécurité & Mot de Passe</h4>
+              <h4 style={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>{t("owner_security_password")}</h4>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "24px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>Nouveau Mot de Passe</label>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>{t("owner_new_password")}</label>
                   <input
                     type="password"
+                    name="new-password"
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={profileForm.motDePasse}
                     onChange={(e) => setProfileForm({ ...profileForm, motDePasse: e.target.value })}
@@ -2210,9 +2286,11 @@ function ProprietaireDashboardInner() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>Confirmer Mot de Passe</label>
+                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>{t("owner_confirm_password")}</label>
                   <input
                     type="password"
+                    name="confirm-new-password"
+                    autoComplete="new-password"
                     placeholder="••••••••"
                     value={profileForm.confirmPassword}
                     onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
@@ -2242,33 +2320,7 @@ function ProprietaireDashboardInner() {
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Enregistrer les Modifications
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.removeItem("user");
-                  localStorage.removeItem("token");
-                  window.location.href = "/login";
-                }}
-                style={{
-                  backgroundColor: "#fff1f2",
-                  color: "#e11d48",
-                  border: "1px solid #fecdd3",
-                  padding: "14px 28px",
-                  borderRadius: "12px",
-                  fontWeight: 800,
-                  fontSize: "0.95rem",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px"
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                Déconnexion Sécurisée
+                {t("owner_save_changes")}
               </button>
             </div>
           </form>
@@ -2279,32 +2331,32 @@ function ProprietaireDashboardInner() {
       {showAddRoomModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
           <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "32px", maxWidth: "540px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>Ajouter une nouvelle chambre</h3>
+            <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>{t("owner_add_room_title")}</h3>
 
             <form onSubmit={handleAddRoom}>
               <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Nom de la chambre *</label>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_name_label")}</label>
                 <input type="text" required placeholder="ex: Suite Majorelle" value={newRoomData.nomChambre} onChange={(e) => setNewRoomData({ ...newRoomData, nomChambre: e.target.value })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }} />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Type de chambre</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_type_label")}</label>
                   <select value={newRoomData.typeChambre} onChange={(e) => setNewRoomData({ ...newRoomData, typeChambre: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.88rem" }}>
-                    <option value="SIMPLE">Chambre Simple</option>
-                    <option value="DOUBLE">Chambre Double</option>
-                    <option value="SUITE">Suite de Luxe</option>
-                    <option value="FAMILIALE">Suite Familiale</option>
+                    <option value="SIMPLE">{t("owner_room_type_simple")}</option>
+                    <option value="DOUBLE">{t("owner_room_type_double")}</option>
+                    <option value="SUITE">{t("owner_room_type_suite")}</option>
+                    <option value="FAMILIALE">{t("owner_room_type_familiale")}</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Prix / nuit (MAD) *</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_price_label")}</label>
                   <input type="number" required value={newRoomData.prixParNuit} onChange={(e) => setNewRoomData({ ...newRoomData, prixParNuit: parseFloat(e.target.value) || 0 })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.9rem" }} />
                 </div>
               </div>
 
               <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Photo (depuis votre disque local)</label>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_photo_label")}</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -2319,9 +2371,9 @@ function ProprietaireDashboardInner() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px" }}>
-                <button type="button" disabled={isSubmittingRoom} onClick={() => setShowAddRoomModal(false)} style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: isSubmittingRoom ? "not-allowed" : "pointer" }}>Annuler</button>
+                <button type="button" disabled={isSubmittingRoom} onClick={() => setShowAddRoomModal(false)} style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: isSubmittingRoom ? "not-allowed" : "pointer" }}>{t("owner_btn_cancel")}</button>
                 <button type="submit" disabled={isSubmittingRoom} style={{ padding: "10px 18px", borderRadius: "10px", border: "none", backgroundColor: "var(--terracotta)", color: "#ffffff", fontWeight: 700, cursor: isSubmittingRoom ? "not-allowed" : "pointer", opacity: isSubmittingRoom ? 0.7 : 1 }}>
-                  {isSubmittingRoom ? "Enregistrement..." : "Créer la Chambre"}
+                  {isSubmittingRoom ? (language === "en" ? "Saving..." : "Enregistrement...") : t("owner_btn_create_room")}
                 </button>
               </div>
             </form>
@@ -2334,34 +2386,34 @@ function ProprietaireDashboardInner() {
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
           <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "32px", maxWidth: "540px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
             <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>
-              Modifier la chambre : {editingRoom.nomChambre}
+              {t("owner_edit_room_title")} : {editingRoom.nomChambre}
             </h3>
 
             <form onSubmit={handleSaveEditRoom}>
               <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Nom de la chambre *</label>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_name_label")}</label>
                 <input type="text" required value={editingRoom.nomChambre} onChange={(e) => setEditingRoom({ ...editingRoom, nomChambre: e.target.value })} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }} />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Type de chambre</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_type_label")}</label>
                   <select value={editingRoom.typeChambre} onChange={(e) => setEditingRoom({ ...editingRoom, typeChambre: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.88rem" }}>
-                    <option value="SIMPLE">Chambre Simple</option>
-                    <option value="DOUBLE">Chambre Double</option>
-                    <option value="SUITE">Suite de Luxe</option>
-                    <option value="FAMILIALE">Suite Familiale</option>
+                    <option value="SIMPLE">{t("owner_room_type_simple")}</option>
+                    <option value="DOUBLE">{t("owner_room_type_double")}</option>
+                    <option value="SUITE">{t("owner_room_type_suite")}</option>
+                    <option value="FAMILIALE">{t("owner_room_type_familiale")}</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>Prix / nuit (MAD) *</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t("owner_room_price_label")}</label>
                   <input type="number" required value={editingRoom.prixParNuit} onChange={(e) => setEditingRoom({ ...editingRoom, prixParNuit: parseFloat(e.target.value) || 0 })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "0.9rem" }} />
                 </div>
               </div>
 
               <div style={{ marginBottom: "18px" }}>
                 <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
-                  Changer la photo de la chambre (depuis votre disque local)
+                  {t("owner_room_change_photo_label")}
                 </label>
                 <div style={{ display: "flex", gap: "14px", alignItems: "center", backgroundColor: "#f8fafc", padding: "12px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
                   {(editingRoomFilePreview || editingRoom.photoUrl) && (
@@ -2388,8 +2440,8 @@ function ProprietaireDashboardInner() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px" }}>
-                <button type="button" onClick={() => setEditingRoom(null)} style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>Annuler</button>
-                <button type="submit" style={{ padding: "10px 18px", borderRadius: "10px", border: "none", backgroundColor: "var(--terracotta)", color: "#ffffff", fontWeight: 700, cursor: "pointer" }}>Sauvegarder les modifications</button>
+                <button type="button" onClick={() => setEditingRoom(null)} style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>{t("owner_btn_cancel")}</button>
+                <button type="submit" style={{ padding: "10px 18px", borderRadius: "10px", border: "none", backgroundColor: "var(--terracotta)", color: "#ffffff", fontWeight: 700, cursor: "pointer" }}>{t("owner_btn_save_changes_room")}</button>
               </div>
             </form>
           </div>
@@ -2407,11 +2459,11 @@ function ProprietaireDashboardInner() {
                 <line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
             </div>
-            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#0f172a", margin: "0 0 8px 0" }}>Supprimer la Chambre ?</h3>
-            <p style={{ fontSize: "0.88rem", color: "#64748b", marginBottom: "24px" }}>Êtes-vous sûr de vouloir supprimer la chambre <strong>"{roomToDelete.nomChambre}"</strong> ?</p>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#0f172a", margin: "0 0 8px 0" }}>{t("owner_room_delete_confirm_title")}</h3>
+            <p style={{ fontSize: "0.88rem", color: "#64748b", marginBottom: "24px" }}>{t("owner_room_delete_confirm_msg")} <strong>"{roomToDelete.nomChambre}"</strong> ?</p>
             <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-              <button onClick={() => setRoomToDelete(null)} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>Annuler</button>
-              <button onClick={confirmDeleteRoom} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#ffffff", fontWeight: 700, cursor: "pointer" }}>Oui, Supprimer</button>
+              <button onClick={() => setRoomToDelete(null)} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>{t("owner_btn_cancel")}</button>
+              <button onClick={confirmDeleteRoom} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#ffffff", fontWeight: 700, cursor: "pointer" }}>{t("owner_btn_yes_delete")}</button>
             </div>
           </div>
         </div>
@@ -2431,10 +2483,10 @@ function ProprietaireDashboardInner() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: "1.3rem", fontWeight: 800, margin: 0, letterSpacing: "-0.2px" }}>
-                      Check-in & Enregistrement Client
+                      {t("owner_checkin_modal_title")}
                     </h3>
                     <p style={{ margin: "4px 0 0 0", fontSize: "0.84rem", opacity: 0.85 }}>
-                      Enregistrement d'arrivée au {checkInReservation.riad?.nom || selectedRiad?.nom || "Riad"}
+                      {t("owner_checkin_arrival_at")} {checkInReservation.riad?.nom || selectedRiad?.nom || "Riad"}
                     </p>
                   </div>
                 </div>
@@ -2451,19 +2503,19 @@ function ProprietaireDashboardInner() {
             {/* Récapitulatif du séjour */}
             <div style={{ padding: "18px 32px", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", fontSize: "0.84rem" }}>
               <div>
-                <div style={{ color: "#64748b", fontWeight: 600 }}>N° Réservation</div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>{t("owner_booking_id_short")}</div>
                 <div style={{ color: "#0f172a", fontWeight: 800 }}>#{checkInReservation.id.substring(0, 8)}</div>
               </div>
               <div>
-                <div style={{ color: "#64748b", fontWeight: 600 }}>Dates du Séjour</div>
-                <div style={{ color: "#0f172a", fontWeight: 800 }}>Du {checkInReservation.dateDebut} au {checkInReservation.dateFin}</div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>{t("owner_stay_dates")}</div>
+                <div style={{ color: "#0f172a", fontWeight: 800 }}>{t("from")} {checkInReservation.dateDebut} {t("to")} {checkInReservation.dateFin}</div>
               </div>
               <div>
-                <div style={{ color: "#64748b", fontWeight: 600 }}>Hébergement</div>
-                <div style={{ color: "#0f172a", fontWeight: 800 }}>{checkInReservation.riadEntier ? "Riad Entier" : (checkInReservation.chambres && checkInReservation.chambres.length > 0 ? checkInReservation.chambres.map(c => c.nomChambre).join(", ") : "Chambre")}</div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>{t("owner_accommodation_label")}</div>
+                <div style={{ color: "#0f172a", fontWeight: 800 }}>{checkInReservation.riadEntier ? t("owner_type_entire_riad") : (checkInReservation.chambres && checkInReservation.chambres.length > 0 ? checkInReservation.chambres.map(c => c.nomChambre).join(", ") : t("owner_type_single_room"))}</div>
               </div>
               <div>
-                <div style={{ color: "#64748b", fontWeight: 600 }}>Montant Total</div>
+                <div style={{ color: "#64748b", fontWeight: 600 }}>{t("owner_total_amount")}</div>
                 <div style={{ color: "var(--terracotta, #d96b43)", fontWeight: 800, fontSize: "0.95rem" }}>{checkInReservation.prixTotal} MAD</div>
               </div>
             </div>
@@ -2473,7 +2525,7 @@ function ProprietaireDashboardInner() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
-                    Nom du client *
+                    {t("owner_guest_lastname")}
                   </label>
                   <input
                     type="text"
@@ -2485,7 +2537,7 @@ function ProprietaireDashboardInner() {
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
-                    Prénom du client *
+                    {t("owner_guest_firstname")}
                   </label>
                   <input
                     type="text"
@@ -2501,27 +2553,27 @@ function ProprietaireDashboardInner() {
               <div style={{ backgroundColor: "#fef3c7", padding: "16px 20px", borderRadius: "14px", border: "1px solid #fde68a", marginBottom: "18px" }}>
                 <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#92400e", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                  Informations d'Identité Légale (Fiche de Police)
+                  {t("owner_legal_id_info")}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: "14px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
-                      Type de pièce *
+                      {t("owner_id_type_label")}
                     </label>
                     <select
                       value={checkInForm.typePieceIdentite}
                       onChange={(e) => setCheckInForm({ ...checkInForm, typePieceIdentite: e.target.value })}
                       style={{ width: "100%", padding: "9px 10px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontWeight: 700, fontSize: "0.85rem", color: "#78350f" }}
                     >
-                      <option value="CIN">CIN Marocaine</option>
-                      <option value="PASSEPORT">Passeport Étranger</option>
-                      <option value="CARTE_SEJOUR">Carte de Séjour</option>
+                      <option value="CIN">{t("owner_id_cin")}</option>
+                      <option value="PASSEPORT">{t("owner_id_passport")}</option>
+                      <option value="CARTE_SEJOUR">{t("owner_id_residence")}</option>
                     </select>
                   </div>
 
                   <div>
                     <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
-                      Numéro de pièce (CIN / Passeport) *
+                      {t("owner_id_number_label")}
                     </label>
                     <input
                       type="text"
@@ -2535,11 +2587,11 @@ function ProprietaireDashboardInner() {
 
                   <div>
                     <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
-                      Nationalité
+                      {t("owner_nationality_label")}
                     </label>
                     <input
                       type="text"
-                      placeholder="Ex: Marocaine"
+                      placeholder={language === "en" ? "Ex: Moroccan" : "Ex: Marocaine"}
                       value={checkInForm.nationalite}
                       onChange={(e) => setCheckInForm({ ...checkInForm, nationalite: e.target.value })}
                       style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: "1px solid #fcd34d", backgroundColor: "#ffffff", fontWeight: 600, fontSize: "0.85rem" }}
@@ -2550,7 +2602,7 @@ function ProprietaireDashboardInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "12px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
-                      Date de naissance
+                      {t("owner_birthdate_label")}
                     </label>
                     <input
                       type="date"
@@ -2561,7 +2613,7 @@ function ProprietaireDashboardInner() {
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#78350f", marginBottom: "4px" }}>
-                      Nombre d'occupants
+                      {t("owner_occupants_count_label")}
                     </label>
                     <input
                       type="number"
@@ -2579,7 +2631,7 @@ function ProprietaireDashboardInner() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
-                    Téléphone de contact
+                    {t("owner_contact_phone_label")}
                   </label>
                   <input
                     type="tel"
@@ -2590,7 +2642,7 @@ function ProprietaireDashboardInner() {
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
-                    Email du voyageur
+                    {t("owner_guest_email_label")}
                   </label>
                   <input
                     type="email"
@@ -2610,11 +2662,11 @@ function ProprietaireDashboardInner() {
                     onChange={(e) => setCheckInForm({ ...checkInForm, paiementEffectueSurPlace: e.target.checked })}
                     style={{ width: "18px", height: "18px", accentColor: "#16a34a" }}
                   />
-                  <span>Confirmer le règlement du séjour ({checkInReservation.prixTotal} MAD)</span>
+                  <span>{t("owner_confirm_payment_onsite")} ({checkInReservation.prixTotal} MAD)</span>
                 </label>
                 {checkInForm.paiementEffectueSurPlace && (
                   <div style={{ marginTop: "10px", display: "flex", gap: "12px", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.8rem", color: "#15803d", fontWeight: 700 }}>Mode d'encaissement :</span>
+                    <span style={{ fontSize: "0.8rem", color: "#15803d", fontWeight: 700 }}>{t("owner_collect_mode")}</span>
                     {["ESPECES", "CARTE_BANCAIRE", "VIREMENT"].map((m) => (
                       <label key={m} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.82rem", color: "#166534", fontWeight: 600, cursor: "pointer" }}>
                         <input
@@ -2625,7 +2677,7 @@ function ProprietaireDashboardInner() {
                           onChange={(e) => setCheckInForm({ ...checkInForm, methodePaiementSurPlace: e.target.value })}
                           style={{ accentColor: "#16a34a" }}
                         />
-                        {m === "ESPECES" ? "Espèces" : m === "CARTE_BANCAIRE" ? "Carte TPE" : "Virement"}
+                        {m === "ESPECES" ? t("owner_cash") : m === "CARTE_BANCAIRE" ? t("owner_card_pos") : t("owner_bank_transfer")}
                       </label>
                     ))}
                   </div>
@@ -2635,11 +2687,11 @@ function ProprietaireDashboardInner() {
               {/* Remarques & Besoins spécifiques */}
               <div style={{ marginBottom: "24px" }}>
                 <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>
-                  Remarques / Demandes d'accueil (ex: Clés remises, Lit bébé, Petit-déjeuner)
+                  {t("owner_checkin_remarks_label")}
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Notes internes pour le séjour du client..."
+                  placeholder={t("owner_checkin_remarks_placeholder")}
                   value={checkInForm.remarques}
                   onChange={(e) => setCheckInForm({ ...checkInForm, remarques: e.target.value })}
                   style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.86rem", resize: "vertical" }}
@@ -2653,7 +2705,7 @@ function ProprietaireDashboardInner() {
                   onClick={() => setCheckInReservation(null)}
                   style={{ padding: "12px 20px", borderRadius: "12px", border: "1px solid #cbd5e1", backgroundColor: "#ffffff", color: "#475569", fontWeight: 700, cursor: "pointer" }}
                 >
-                  Annuler
+                  {t("owner_btn_cancel")}
                 </button>
                 <button
                   type="submit"
@@ -2674,7 +2726,7 @@ function ProprietaireDashboardInner() {
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  {isSubmittingCheckIn ? "Validation en cours..." : "Confirmer & Valider le Check-in"}
+                  {isSubmittingCheckIn ? (language === "en" ? "Validating..." : "Validation en cours...") : t("owner_btn_confirm_checkin")}
                 </button>
               </div>
             </form>
@@ -2691,7 +2743,7 @@ function ProprietaireDashboardInner() {
             <div style={{ padding: "16px 28px", backgroundColor: "#0f172a", color: "#ffffff", display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "20px 20px 0 0" }}>
               <div style={{ fontWeight: 800, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "10px" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Fiche d'Enregistrement Client (Check-in Validé)
+                {t("owner_police_voucher_title")}
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <button
@@ -2712,14 +2764,14 @@ function ProprietaireDashboardInner() {
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
-                  Imprimer la Fiche
+                  {t("owner_btn_print_sheet")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewingCheckInVoucher(null)}
                   style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "#ffffff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
                 >
-                  Fermer
+                  {t("owner_close")}
                 </button>
               </div>
             </div>
@@ -2736,14 +2788,14 @@ function ProprietaireDashboardInner() {
                     {viewingCheckInVoucher.riad?.adresse || selectedRiad?.adresse || "Médina"}, {viewingCheckInVoucher.riad?.ville || selectedRiad?.ville || "Maroc"}
                   </div>
                   <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>
-                    Plateforme Officielle MoroccoRiads • Hospitality Management
+                    MoroccoRiads Hospitality Management
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase", fontWeight: 800 }}>Fiche N°</div>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "uppercase", fontWeight: 800 }}>{language === "en" ? "Form No." : "Fiche N°"}</div>
                   <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a" }}>CHK-{viewingCheckInVoucher.id.substring(0, 8).toUpperCase()}</div>
                   <div style={{ fontSize: "0.78rem", color: "#16a34a", fontWeight: 800, marginTop: "4px", backgroundColor: "#dcfce7", padding: "3px 8px", borderRadius: "6px", display: "inline-block" }}>
-                    ✓ CHECK-IN CONFIRMÉ
+                    ✓ {t("status_confirmed")}
                   </div>
                 </div>
               </div>
@@ -2751,10 +2803,10 @@ function ProprietaireDashboardInner() {
               {/* Titre Document */}
               <div style={{ textAlign: "center", marginBottom: "28px" }}>
                 <h2 style={{ fontSize: "1.2rem", fontWeight: 900, textTransform: "uppercase", letterSpacing: "1px", color: "#0f172a", margin: 0 }}>
-                  Fiche Individuelle de Séjour & d'Accueil
+                  {t("owner_police_sheet_doc_title")}
                 </h2>
                 <p style={{ fontSize: "0.8rem", color: "#64748b", margin: "4px 0 0 0" }}>
-                  Enregistrement officiel de l'hôte à l'arrivée (Hospitalité Marocaine)
+                  {t("owner_police_sheet_doc_sub")}
                 </p>
               </div>
 
@@ -2763,30 +2815,30 @@ function ProprietaireDashboardInner() {
                 <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
                   <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    Renseignements du Client
+                    {t("owner_guest_details_box")}
                   </div>
                   <div style={{ fontSize: "0.84rem", display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <div><strong>Nom & Prénom :</strong> {viewingCheckInVoucher.clientPrenom || viewingCheckInVoucher.client?.prenom || ""} {viewingCheckInVoucher.clientNom || viewingCheckInVoucher.client?.nom || "Client"}</div>
-                    <div><strong>Document d'Identité :</strong> {viewingCheckInVoucher.clientTypePieceIdentite || "CIN"} N° <strong>{viewingCheckInVoucher.clientNumeroPieceIdentite || "Non spécifié"}</strong></div>
-                    <div><strong>Nationalité :</strong> {viewingCheckInVoucher.clientNationalite || "Marocaine"}</div>
-                    <div><strong>Date de Naissance :</strong> {viewingCheckInVoucher.clientDateNaissance || "N/A"}</div>
-                    <div><strong>Téléphone :</strong> {viewingCheckInVoucher.clientTelephone || viewingCheckInVoucher.client?.telephone || "N/A"}</div>
-                    <div><strong>Email :</strong> {viewingCheckInVoucher.clientEmail || viewingCheckInVoucher.client?.email || "N/A"}</div>
+                    <div><strong>{t("guest_nom")} & {t("guest_prenom")} :</strong> {viewingCheckInVoucher.clientPrenom || viewingCheckInVoucher.client?.prenom || ""} {viewingCheckInVoucher.clientNom || viewingCheckInVoucher.client?.nom || "Client"}</div>
+                    <div><strong>{t("owner_id_type_label")} :</strong> {viewingCheckInVoucher.clientTypePieceIdentite || "CIN"} N° <strong>{viewingCheckInVoucher.clientNumeroPieceIdentite || (language === "en" ? "Not specified" : "Non spécifié")}</strong></div>
+                    <div><strong>{t("owner_nationality_label")} :</strong> {viewingCheckInVoucher.clientNationalite || (language === "en" ? "Moroccan" : "Marocaine")}</div>
+                    <div><strong>{t("owner_birthdate_label")} :</strong> {viewingCheckInVoucher.clientDateNaissance || "N/A"}</div>
+                    <div><strong>{t("guest_phone")} :</strong> {viewingCheckInVoucher.clientTelephone || viewingCheckInVoucher.client?.telephone || "N/A"}</div>
+                    <div><strong>{t("guest_email")} :</strong> {viewingCheckInVoucher.clientEmail || viewingCheckInVoucher.client?.email || "N/A"}</div>
                   </div>
                 </div>
 
                 <div style={{ backgroundColor: "#f8fafc", padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
                   <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#0f172a", marginBottom: "12px", borderBottom: "1px solid #cbd5e1", paddingBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                    Détails du Séjour
+                    {t("owner_stay_details_box")}
                   </div>
                   <div style={{ fontSize: "0.84rem", display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <div><strong>Date d'Arrivée :</strong> {viewingCheckInVoucher.dateDebut}</div>
-                    <div><strong>Date de Départ :</strong> {viewingCheckInVoucher.dateFin}</div>
-                    <div><strong>Chambre(s) Assignée(s) :</strong> {viewingCheckInVoucher.riadEntier ? "Location Riad Entier" : (viewingCheckInVoucher.chambres && viewingCheckInVoucher.chambres.length > 0 ? viewingCheckInVoucher.chambres.map(c => c.nomChambre).join(", ") : "Chambre")}</div>
-                    <div><strong>Nombre d'occupants :</strong> {viewingCheckInVoucher.nombrePersonnes || 1} personne(s)</div>
-                    <div><strong>Montant Total :</strong> {viewingCheckInVoucher.prixTotal} MAD</div>
-                    <div><strong>Règlement :</strong> {viewingCheckInVoucher.methodePaiementCheckIn ? `Encaissé sur place (${viewingCheckInVoucher.methodePaiementCheckIn})` : "Confirmé / En ligne"}</div>
+                    <div><strong>{t("check_in_date")} :</strong> {viewingCheckInVoucher.dateDebut}</div>
+                    <div><strong>{t("check_out_date")} :</strong> {viewingCheckInVoucher.dateFin}</div>
+                    <div><strong>{t("owner_rooms")} :</strong> {viewingCheckInVoucher.riadEntier ? t("owner_type_entire_riad") : (viewingCheckInVoucher.chambres && viewingCheckInVoucher.chambres.length > 0 ? viewingCheckInVoucher.chambres.map(c => c.nomChambre).join(", ") : t("owner_type_single_room"))}</div>
+                    <div><strong>{t("owner_occupants_count_label")} :</strong> {viewingCheckInVoucher.nombrePersonnes || 1} {t("travelers")}</div>
+                    <div><strong>{t("owner_total_amount")} :</strong> {viewingCheckInVoucher.prixTotal} MAD</div>
+                    <div><strong>{t("payment_method")} :</strong> {viewingCheckInVoucher.methodePaiementCheckIn ? `${t("owner_pay_onsite")} (${viewingCheckInVoucher.methodePaiementCheckIn})` : t("owner_pay_card_confirmed")}</div>
                   </div>
                 </div>
               </div>
@@ -2794,7 +2846,7 @@ function ProprietaireDashboardInner() {
               {/* Remarques */}
               {viewingCheckInVoucher.remarquesCheckIn && (
                 <div style={{ backgroundColor: "#fffbeb", padding: "14px", borderRadius: "10px", border: "1px solid #fde68a", marginBottom: "24px", fontSize: "0.84rem" }}>
-                  <strong>Notes & Remarques d'accueil :</strong> {viewingCheckInVoucher.remarquesCheckIn}
+                  <strong>{t("owner_checkin_remarks_label")} :</strong> {viewingCheckInVoucher.remarquesCheckIn}
                 </div>
               )}
 
@@ -2802,15 +2854,15 @@ function ProprietaireDashboardInner() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "40px", marginTop: "40px", paddingTop: "20px", borderTop: "1px dashed #cbd5e1" }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 700, marginBottom: "48px" }}>
-                    Signature du Voyageur / Hôte
+                    {t("owner_guest_signature")}
                   </div>
                   <div style={{ borderTop: "1px solid #94a3b8", width: "80%", margin: "0 auto", fontSize: "0.75rem", color: "#94a3b8", paddingTop: "4px" }}>
-                    Lu et approuvé
+                    {t("owner_read_approved")}
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 700, marginBottom: "48px" }}>
-                    Cachet & Signature de l'Établissement
+                    {t("owner_establishment_signature")}
                   </div>
                   <div style={{ borderTop: "1px solid #94a3b8", width: "80%", margin: "0 auto", fontSize: "0.75rem", color: "#94a3b8", paddingTop: "4px" }}>
                     {viewingCheckInVoucher.riad?.nom || selectedRiad?.nom || "Direction du Riad"}
@@ -2871,10 +2923,10 @@ function ProprietaireDashboardInner() {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
-                    Nouvelle Réservation Directe
+                    {t("owner_new_direct_booking")}
                   </h3>
                   <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
-                    Enregistrez un client sur place (Walk-in) ou réservation par téléphone
+                    {t("owner_direct_booking_subtitle")}
                   </div>
                 </div>
               </div>
@@ -2893,7 +2945,7 @@ function ProprietaireDashboardInner() {
                 {/* Choix du Riad */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                    Établissement (Riad) *
+                    {t("owner_establishment_label")}
                   </label>
                   <select
                     value={directBookingForm.riadId}
@@ -2917,22 +2969,22 @@ function ProprietaireDashboardInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Type de Réservation
+                      {t("owner_booking_type_label")}
                     </label>
                     <select
                       value={directBookingForm.riadEntier ? "ENTIER" : "CHAMBRE"}
                       onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, riadEntier: e.target.value === "ENTIER" }))}
                       style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
                     >
-                      <option value="CHAMBRE">Chambre Individuelle</option>
-                      <option value="ENTIER">Riad Entier (Exclusif)</option>
+                      <option value="CHAMBRE">{t("owner_type_single_room")}</option>
+                      <option value="ENTIER">{t("owner_type_entire_riad")}</option>
                     </select>
                   </div>
 
                   {!directBookingForm.riadEntier && (
                     <div>
                       <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                        Chambre / Suite *
+                        {t("owner_rooms")} *
                       </label>
                       <select
                         value={directBookingForm.chambreId}
@@ -2940,10 +2992,10 @@ function ProprietaireDashboardInner() {
                         required={!directBookingForm.riadEntier}
                         style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
                       >
-                        <option value="">-- Choisir une chambre --</option>
+                        <option value="">{t("owner_select_room_prompt")}</option>
                         {chambres.map((ch) => (
                           <option key={ch.id} value={ch.id}>
-                            {ch.nomChambre} ({ch.prixParNuit} MAD/nuit)
+                            {ch.nomChambre} ({ch.prixParNuit} MAD/{t("per_night")})
                           </option>
                         ))}
                       </select>
@@ -2955,22 +3007,32 @@ function ProprietaireDashboardInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Date d'Arrivée (Check-in) *
+                      {t("owner_checkin_date_label")}
                     </label>
                     <input
                       type="date"
+                      min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
                       value={directBookingForm.dateDebut}
-                      onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, dateDebut: e.target.value }))}
+                      onChange={(e) => {
+                        const newDebut = e.target.value;
+                        const nextDay = new Date(new Date(newDebut).getTime() + 86400000).toISOString().split("T")[0];
+                        setDirectBookingForm((prev) => ({
+                          ...prev,
+                          dateDebut: newDebut,
+                          dateFin: prev.dateFin && prev.dateFin > newDebut ? prev.dateFin : nextDay
+                        }));
+                      }}
                       required
                       style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
                     />
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Date de Départ (Check-out) *
+                      {t("owner_checkout_date_label")}
                     </label>
                     <input
                       type="date"
+                      min={directBookingForm.dateDebut ? new Date(new Date(directBookingForm.dateDebut).getTime() + 86400000).toISOString().split("T")[0] : new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0]}
                       value={directBookingForm.dateFin}
                       onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, dateFin: e.target.value }))}
                       required
@@ -2983,7 +3045,7 @@ function ProprietaireDashboardInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Nom du Client *
+                      {t("owner_guest_lastname")}
                     </label>
                     <input
                       type="text"
@@ -2996,7 +3058,7 @@ function ProprietaireDashboardInner() {
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Prénom du Client *
+                      {t("owner_guest_firstname")}
                     </label>
                     <input
                       type="text"
@@ -3012,7 +3074,7 @@ function ProprietaireDashboardInner() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Téléphone
+                      {t("guest_phone")}
                     </label>
                     <input
                       type="tel"
@@ -3024,15 +3086,15 @@ function ProprietaireDashboardInner() {
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: "#334155", marginBottom: "6px" }}>
-                      Mode de Règlement
+                      {t("owner_payment_mode_label")}
                     </label>
                     <select
                       value={directBookingForm.methodePaiement}
                       onChange={(e) => setDirectBookingForm((prev) => ({ ...prev, methodePaiement: e.target.value }))}
                       style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", fontSize: "0.9rem", color: "#0f172a", fontWeight: 600 }}
                     >
-                      <option value="SUR_PLACE">Sur Place (Espèces / TPE)</option>
-                      <option value="CARTE_BANCAIRE">Carte Bancaire (Confirmée)</option>
+                      <option value="SUR_PLACE">{t("owner_pay_onsite")}</option>
+                      <option value="CARTE_BANCAIRE">{t("owner_pay_card_confirmed")}</option>
                     </select>
                   </div>
                 </div>
@@ -3045,7 +3107,7 @@ function ProprietaireDashboardInner() {
                   onClick={() => setShowDirectBookingModal(false)}
                   style={{ backgroundColor: "#f1f5f9", color: "#475569", border: "none", borderRadius: "10px", padding: "10px 18px", fontSize: "0.88rem", fontWeight: 700, cursor: "pointer" }}
                 >
-                  Annuler
+                  {t("owner_btn_cancel")}
                 </button>
                 <button
                   type="submit"
@@ -3067,7 +3129,7 @@ function ProprietaireDashboardInner() {
                   }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  {isSubmittingDirectBooking ? "Enregistrement..." : "Confirmer la Réservation"}
+                  {isSubmittingDirectBooking ? (language === "en" ? "Saving..." : "Enregistrement...") : t("owner_btn_confirm_booking")}
                 </button>
               </div>
             </form>
@@ -3080,7 +3142,7 @@ function ProprietaireDashboardInner() {
 
 export default function ProprietaireDashboard() {
   return (
-    <Suspense fallback={<div style={{ padding: "80px", textAlign: "center", color: "#64748b", fontWeight: 700 }}>Chargement du tableau de bord...</div>}>
+    <Suspense fallback={<div style={{ padding: "80px", textAlign: "center", color: "#64748b", fontWeight: 700 }}>Chargement...</div>}>
       <ProprietaireDashboardInner />
     </Suspense>
   );

@@ -100,6 +100,7 @@ public class AuthServiceImpl implements AuthService {
                 .nom(user.getNom())
                 .prenom(user.getPrenom())
                 .email(user.getEmail())
+                .telephone(user.getTelephone())
                 .role(user.getRole())
                 .statut(user.getStatut())
                 .build();

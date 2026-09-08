@@ -98,12 +98,13 @@ public class ReservationServiceImpl implements ReservationService {
         Riad riad = riadRepository.findById(request.getRiadId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Riad non trouvé."));
 
-        // 3. Valider les dates
-        if (request.getDateDebut().isBefore(java.time.LocalDate.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date d'arrivée ne peut pas être dans le passé.");
+        // 3. Valider les dates (interdire les dates passées et le jour même)
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (!request.getDateDebut().isAfter(today)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date d'arrivée ne peut pas être aujourd'hui ou dans le passé. Les réservations doivent débuter au minimum à partir de demain.");
         }
         if (request.getDateDebut().isAfter(request.getDateFin()) || request.getDateDebut().equals(request.getDateFin())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date de début doit être antérieure à la date de fin.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date de départ doit être strictement postérieure à la date d'arrivée (au minimum 1 nuit).");
         }
 
         long nuits = ChronoUnit.DAYS.between(request.getDateDebut(), request.getDateFin());
